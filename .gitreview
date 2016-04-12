@@ -1,0 +1,4 @@
+[gerrit]
+host=l-gerrit.mtl.labs.mlnx
+port=29418
+project=dcs/mlnx-project-config.git
