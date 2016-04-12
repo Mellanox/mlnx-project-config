@@ -1,0 +1,66 @@
+- project:
+    name: Neutron-ML2-MLNX
+    github-org: openstack-dev
+    node: SLAVE_ML2
+
+    jobs:
+      - 'Neutron-ML2-MLNX'
+
+- project:
+    name: Neutron-ML2-Sriov
+    github-org: openstack-dev
+    node: SLAVE_SRIOV
+
+    jobs:
+      - 'Neutron-ML2-Sriov'
+
+- project:
+    name: Neutron-Networking-MLNX-ML2
+    github-org: openstack-dev
+    node: SLAVE_ML2
+
+    jobs:
+        - Neutron-Networking-MLNX-ML2
+
+- project:
+    name: Nova-ML2-Sriov
+    github-org: openstack-dev
+    node: SLAVE_SRIOV
+
+    jobs:
+        - 'Nova-ML2-Sriov'
+
+- project:
+    name: Nova-MACVTAP-ML2-Sriov
+    github-org: openstack-dev
+    node: SLAVE_SRIOV_MACVTAP
+
+    jobs:
+        - 'Nova-MACVTAP-ML2-Sriov'
+
+- project:
+    name: Ironic-IB
+    github-org: openstack-dev
+    node: SLAVE_IRONIC_IB
+
+    jobs:
+        - 'Ironic-IB'
+
+
+- project:
+    name: NOOP
+    github-org: openstack-dev
+    node: SLAVE_SRIOV
+
+    jobs:
+        - 'NOOP'
+
+- project:
+    name: Tempest-Sriov
+    github-org: openstack-dev
+    node: SLAVE_SRIOV
+
+    jobs:
+        - 'Tempest-Sriov'
+
+

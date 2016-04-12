@@ -1,0 +1,1292 @@
+- builder:
+    name: check-environment
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            status=0
+            if [ `whoami` != 'stack' ]; then
+                echo "Error, user is not stack"
+                status=1
+                exit 1
+            fi
+
+            for i in `ibdev2netdev | awk '{print $5}'`; do
+                sudo ifconfig $i up
+            done
+            mlnx_port=`ip link show |grep -a2 vf |head -n1 |awk '{print $2}' |tr -d :`
+            ibdev2netdev |grep $mlnx_port | head -n1 |grep Up
+            if [ -z $? ]; then
+                echo "ERROR"
+                exit 1
+            fi
+            sudo killall -9 radvd 2>&1|tee > /dev/null
+            sudo losetup -a
+            echo "Environment is OK"
+
+
+- builder:
+    name: collect-config-files
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="COLLECT CONFIG FILES"
+
+            pip freeze > $WORKSPACE/ci-artifacts/logs/pip-freeze.txt
+
+            projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
+            mkdir -p $WORKSPACE/ci-artifacts/etc
+            for project in ${projects[@]}; do
+                [ -d /etc/$project ] && cp -r /etc/$project $WORKSPACE/ci-artifacts/etc/
+            done
+
+            [ -d /opt/stack/tempest/.testrepository ] && cp -L -r /opt/stack/tempest/.testrepository $WORKSPACE/ci-artifacts/
+            [ -f /opt/stack/tempest/tempest.log ] && cp -L /opt/stack/tempest/tempest.log $WORKSPACE/ci-artifacts/logs/
+            [ -f /opt/stack/tempest/etc/tempest.conf ] && cp -L /opt/stack/tempest/etc/tempest.conf $WORKSPACE/ci-artifacts/
+            [ -f $WORKSPACE/devstack/local.conf ] && cp $WORKSPACE/devstack/local.conf $WORKSPACE/ci-artifacts/
+            [ -f /var/log/eswitchd/eswitchd.log ] && cp /var/log/eswitchd/eswitchd.log $WORKSPACE/ci-artifacts/logs/
+
+            exit 0
+
+
+- builder:
+    name: clean-environment
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="CLEAN-ENVIRONMENT"
+            echo "STARTED:############## $phase  ###################"
+            echo "Deleting files older than 1 days from /tmp"
+            sudo find /tmp -type f -mtime +1 -exec sudo rm -rf {} \;
+            sudo find /tmp -type d -mtime +1 -exec sudo rm -rf {} \;
+            echo "Deleting archives older than 10 days from /var/log"
+            sudo rm -f `find /var/log -name *.gz`
+
+            # Use this workaround in case that Mellanox repo is down
+            #sudo \cp /.autodirect/mtrswgwork/lennyb/work/CloudX/CI/os-ext-testing/etc/sources_mlnx.list /etc/apt/sources.list
+            #sudo \cp /.autodirect/mtrswgwork/lennyb/work/CloudX/CI/os-ext-testing/etc/sources_asia.list /etc/apt/sources.list
+
+            rm -rf ~/.cache/*
+            sudo rm -rf /root/.cache/pip
+            sudo rm -rf /var/cache/apt
+            sudo sh -c "> /var/log/conntrackd-stats.log"
+            sudo sh -c "> /var/log/libvirt/libvirtd.log"
+            sudo rm -f `sudo find /var/log -name *.log.*`
+
+
+            sudo dpkg --configure -a
+            sudo dmesg -c > /dev/null
+
+            sudo pip uninstall ovs -y
+            sudo pip install pbr
+            sudo pip install eventlet
+            sudo apt-get install -y crudini
+
+            sudo apt-get remove rabbitmq-server -y
+            sudo apt-get autoremove -y
+            sudo kill -9 `pgrep rabbitmq`
+            sudo kill -9 `pgrep beam.smp`
+            sudo kill -9 `ps -ef |grep swift | grep pyth | awk '{print $2}'`
+            sudo pip install setuptools==20.1.1
+
+            [ -d /opt/stack/tempest ] && rm -rf /opt/stack/tempest
+
+            if [ -d $WORKSPACE/devstack ]; then
+                echo "Cleaning up possible remainings of previous builds."
+                $WORKSPACE/devstack/unstack.sh
+                $WORKSPACE/devstack/clean.sh
+            fi
+
+            for file in `ls /opt/stack/*/requirements.txt`
+            do
+              sudo pip uninstall -r $file -y 2>&1|tee > /dev/null
+            done
+
+            [ -d $WORKSPACE/devstack ] && rm -rf $WORKSPACE/devstack
+            [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
+            [ -d /opt/stack ] && sudo rm -rf /opt/stack
+            sudo rm -f /var/log/apache2/keystone*
+
+            #Cleaning semaphores"
+            for sem in `ipcs -s | grep root|awk '{print $2}'`; do
+                for pid in `ipcs -s -i $sem|grep pid -a1|tail -n1|awk '{print $NF}'`; do
+                    [ ! -d /proc/$pid ] && sudo ipcrm -s $sem
+                done
+            done
+
+            sudo apt-get remove -y python-requests
+
+            #echo killing all python procs
+            retries=10
+            delay=10
+            ps -ef |grep /usr/bin/python |grep -v grep |grep -v ipoibd
+            pid=$?
+            while [[ $retries -gt 0 ]] && [[ $pid -eq 0 ]]; do
+                sleep $delay
+                for pid in `ps -ef |grep /usr/bin/python |grep -v grep |grep -v ipoibd |awk '{print $2}'`; do
+                    sudo kill $pid
+                done
+                ps -ef |grep /usr/bin/python |grep -v grep
+                pid=$?
+                let retries=retries-1
+            done
+
+            echo "Check if ipoibd is running"
+            ipoibd=`pgrep ipoibd`
+
+            if [[ -n $ipoibd ]]; then
+                echo "Restarting ipoibd"
+                sudo /sbin/ipoibd -D eth_ipoib & 2>&1|tee > /dev/null
+            fi
+            echo "FINISHED:############## $phase  ###################"
+
+- builder:
+    name: apply-workarounds-pre-stack
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="APPLY-WORKAROUNDS-PRE"
+            echo "STARTED: ############## $phase  ###################"
+
+            echo "Delete all Bridges"
+            for br in `sudo ovs-vsctl list-br`; do
+                sudo ovs-vsctl del-br \$br
+            done
+
+
+- builder:
+    name: apply-workarounds-post-stack
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="APPLY-WORKAROUNDS-POST"
+            echo "STARTED: ############## $phase  ###################"
+            pip list|grep tempest-lib
+            sudo pip install tempest-lib --upgrade
+            pip list|grep tempest-lib
+
+            for port in `ibdev2netdev |grep _0 | grep Up |awk '{print $5}'`; do
+                if [ -z $port ]; then
+                    echo "Error finding ipoib port"
+                    echo "ibdev2netdev |grep _0 |grep Up |awk '{print $5}'"
+                    exit 1
+                else
+                    sudo ovs-vsctl --may-exist add-port br-$port $port 2>&1|tee> /dev/null
+                fi
+            done
+
+- builder:
+    name: apply-workarounds-post-stack-Ironic-IB
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="APPLY-WORKAROUNDS-POST-Ironic-IB"
+            cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py /opt/stack/tempest/tempest/api/baremetal/admin/test_ports.py
+            cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py /opt/stack/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py
+            cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/config.py /opt/stack/ironic/ironic_tempest_plugin/config.py
+
+            #update
+            #/opt/stack/nova/nova/virt/ironic/client_wrapper.py
+            #set IRONIC_API_VERSION = (1, 17)
+            #/opt/stack/ironic/ironic/api/controllers/v1/versions.py
+            #set MIN_VERSION_STRING = '1.17'
+
+
+- builder:
+    name: noop-run
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          env
+
+- builder:
+    name: configure-tempest-direct
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-TEMPEST-DIRECT"
+          sudo cp /opt/stack/tempest/etc/tempest.conf $WORKSPACE/ci-artifacts/tempest_macvtap.conf
+          sudo crudini --set /opt/stack/tempest/etc/tempest.conf network port_vnic_type direct
+          #mlnx_port=`ip link show |grep -a2 vf |head -n1 |awk '{print $2}' |tr -d :`
+          #for vf in `ip link show p1p1 | grep vf | awk '{print $2}'`; do
+          #    sudo ip link set $mlnx_port vf $vf mac 00:00:00:00:00:01
+          #done
+
+- builder:
+    name: configure-devstack-Neutron-ML2-MLNX
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Neutron-ML2-MLNX"
+          echo "STARTED: ############## $phase  ###################"
+          ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
+          export NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
+          if [ $NETWORKING_MLNX_BRANCH != 'master' ]; then
+              export MLNX_DRIVER='mlnx'
+          else
+              export MLNX_DRIVER='mlnx_infiniband'
+          fi
+          echo "MLNX_DRIVER=$MLNX_DRIVER"
+
+          cat > $WORKSPACE/devstack/local.conf  <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/cirros-mellanox-x86_64-disk-ib.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          # mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          mlnx_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|tail -n1\`
+          epioib_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|head -n1\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=${MLNX_DRIVER},openvswitch
+          Q_AGENT=openvswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:10
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${epioib_port}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-novnc n-xvnc n-cauth horizon
+          disable_service h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
+          enable_service eswitchd
+          enable_service mlnx-agt mlnx_dnsmasq
+          enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          #suspend=false
+          resize=false
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          port_admin_state_change=false
+          [scenario]
+          dhcp_client=
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-Neutron-ML2-Sriov
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Neutron-ML2-Sriov"
+          echo "STARTED: ############## $phase  ###################"
+          cat >  $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-cauth horizon n-novnc n-xvnc h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ml2_sriov]
+          agent_required=True
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=direct
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-Ironic-IB
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Ironic-IB"
+          echo "STARTED: ############## $phase  ###################"
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          #DOWNLOAD_DEFAULT_IMAGES=False
+          #IMAGE_URLS="http://144.76.193.39/images/cirros-mellanox-x86_64-disk-ib.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          DEFAULT_PASSWORD=password
+          SWIFT_TEMPURL_KEY=password
+          SWIFT_HASH=password
+          SWIFT_ENABLE_TEMPURLS=True
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          RECLONE=yes
+          USE_SCREEN=True
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+
+          #mlnx_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|tail -n1\`
+          #epioib_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|head -n1\`
+          epioib_port=eth2
+          #mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+
+          PHYSICAL_INTERFACE=\$epioib_port
+          PHYSICAL_NETWORK=default
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+
+          #NOVA_BRANCH=refs/changes/40/266540/7
+
+          disable_service n-net n-novnc horizon
+          disable_service heat h-api h-api-cfn h-api-cw h-eng
+          disable_service cinder c-sch c-api c-vol
+          enable_service ironic ir-api ir-cond
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
+          enable_service s-proxy s-object s-container s-account
+          enable_service s-proxy s-object s-container s-account
+          enable_service tempest
+
+          # Moshe's patch
+          enable_plugin ironic https://github.com/openstack/ironic refs/changes/63/264263/21
+
+          # microversion patch
+          #enable_plugin ironic https://github.com/openstack/ironic refs/changes/58/260358/6
+
+          enable_plugin ironic-inspector https://github.com/openstack/ironic-inspector refs/changes/57/264257/20
+
+          TEMPEST_BRANCH=refs/changes/07/292307/6
+
+          NOVA_BRANCH=refs/changes/40/266540/7
+          enable_plugin ironic https://github.com/openstack/ironic refs/changes/63/264263/20
+          enable_plugin ironic-inspector https://github.com/openstack/ironic-inspector refs/changes/57/264257/19
+          enable_plugin tempest https://github.com/openstack/tempest refs/changes/07/292307/5
+
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan,flat
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+
+          ENABLE_TENANT_TUNNELS=False
+          TENANT_VLAN_RANGE=2:100
+
+          IRONIC_BAREMETAL_BASIC_OPS=True
+          IRONIC_INSPECTOR_RAMDISK_ELEMENT=ironic-agent
+          IRONIC_INSPECTOR_BUILD_RAMDISK=False
+          VIRT_DRIVER=ironic
+          IRONIC_DEPLOY_DRIVER=pxe_ssh
+          IRONIC_VM_LOG_DIR=/opt/stack/$LOGDIR/ironic-bm-logs
+          DEFAULT_INSTANCE_TYPE=baremetal
+          BUILD_TIMEOUT=600
+          IRONIC_CALLBACK_TIMEOUT=600
+          IRONIC_BUILD_DEPLOY_RAMDISK=False
+          IRONIC_ENABLED_DRIVERS=fake,pxe_ssh,pxe_ipmitool,agent_ipmitool
+          IRONIC_VM_EPHEMERAL_DISK=1
+          VOLUME_BACKING_FILE_SIZE=1000
+          FORCE_CONFIG_DRIVE=True
+          IRONIC_VM_SPECS_RAM=1024
+          IRONIC_VM_COUNT=1
+          IRONIC_DEPLOY_DRIVER_ISCSI_WITH_IPA=True
+          IRONIC_RAMDISK_TYPE=coreos
+          IRONIC_IPXE_ENABLED=True
+
+          IRONIC_CONDUCTOR_CLEAN_NODES=false
+          IRONIC_CONDUCTOR_DEPLOY_CALLBACK_TIMEOUT=600
+
+          IRONIC_INSPECTOR_MANAGE_FIREWALL=False
+          IRONIC_VM_SSH_PORT=22
+
+          SCREEN_LOGDIR=/opt/stack/logs/screen
+          TEMPEST_ALLOW_TENANT_ISOLATION=False
+
+          [[post-config||/etc/ironic-inspector/inspector.conf]]
+          [DEFAULT]
+          timeout=120
+          [firewall]
+          dnsmasq_interface = br-\$epioib_port
+          manage_firewall = False
+
+          [[post-config|/etc/neutron/dhcp_agent.ini]]
+          [DEFAULT]
+          dhcp_broadcast_reply=True
+
+          [[post-config|/etc/ironic/ironic.conf]]
+          [conductor]
+          clean_nodes=false
+          deploy_callback_timeout=600
+
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [auth]
+          use_dynamic_credentials = True
+          [baremetal]
+          infrastructure_type = infiniband
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: configure-devstack-Neutron-Networking-MLNX-ML2
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Neutron-Networking-MLNX-ML2"
+          echo "STARTED: ############## $phase  ###################"
+          ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
+          echo "ZUUL_BRANCH=$ZUUL_BRANCH"
+          export NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
+          echo "NETWORKING_MLNX_BRANCH=$NETWORKING_MLNX_BRANCH"
+          if [ $NETWORKING_MLNX_BRANCH != 'master' ]; then
+              export MLNX_DRIVER='sdnmechdriver,mlnx'
+          else
+              export MLNX_DRIVER='mlnx_sdn_assist,mlnx_infiniband'
+          fi
+          echo "MLNX_DRIVER=$MLNX_DRIVER"
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/cirros-mellanox-x86_64-disk-ib.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          # mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          mlnx_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|tail -n1\`
+          epioib_port=\`ibdev2netdev |grep Up |awk '{print \$5}'|head -n1\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=${MLNX_DRIVER},openvswitch
+          Q_AGENT=openvswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:10
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${epioib_port}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-novnc n-xvnc n-cauth horizon h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt
+          enable_service eswitchd
+          enable_service mlnx-agt mlnx_dnsmasq
+          enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [sdn]
+          url = http://127.0.0.1:5001/cloudx_api
+          username = admin
+          password = admin
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          resize=false
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          port_admin_state_change=false
+          [scenario]
+          dhcp_client=
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-Nova-MACVTAP-ML2-Sriov
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Nova-MACVTAP-ML2-Sriov"
+          echo "STARTED: ############## $phase  ###################"
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-novnc n-xvnc n-cauth horizon h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ml2_sriov]
+          supported_pci_vendor_devs = 15b3:1014
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=macvtap
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: configure-devstack-Nova-ML2-Sriov
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Nova-ML2-Sriov"
+          echo "STARTED: ############## $phase  ###################"
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-novnc n-xvnc n-cauth horizon h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ml2_sriov]
+          agent_required=True
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=direct
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: configure-devstack-Tempest-Sriov
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Tempest-Sriov"
+          echo "STARTED: ############## $phase  ###################"
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://144.76.193.39/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=\$(host \$(hostname) | cut -d' ' -f4)
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          mlnx_port=\`ip link show |grep -a2 vf |head -n1 |awk '{print \$2}' |tr -d :\`
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=\${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          # Services
+          disable_service n-net n-novnc n-xvnc n-cauth horizon h-eng h-api h-api-cfn h-api-cw
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print \$1}' |  sed s/\.0\$//g\`
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          pci_passthrough_whitelist ={"'"address"'":"'"*:'"\${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ml2_sriov]
+          agent_required=True
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          #suspend=False
+          [network]
+          port_vnic_type=direct
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: os-ext-testing
+    builders:
+       - shell: |
+          #!/bin/bash +ex
+          phase="EXTERNAL-TESTING-CHECKOUT"
+          echo "STARTED: ############## $phase  ###################"
+          if [ -d $WORKSPACE/os-ext-testing ];then
+              pushd $WORKSPACE/os-ext-testing
+              git pull
+              popd
+          else
+              git clone http://r-webdev02.lab.mtl.com:8080/os-ext-testing
+          fi
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-stacksh
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="RUN-STACKSH"
+          echo "STARTED: ############## $phase  ###################"v
+          if [[ -n $ZUUL_PROJECT ]]; then
+              project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
+              refspec=$(echo ${ZUUL_CHANGES##*^} | cut -d':' -f3)
+              project=${project//-/_}
+              export ${project^^}_BRANCH=$refspec
+          fi
+          #For latest Ubuntu
+          export FORCE=yes
+
+          if [ $ZUUL_BRANCH == 'stable/kilo' ];then
+              export ESWITCHD_BRANCH="0.14"
+          else
+              export ESWITCHD_BRANCH="master"
+          fi
+
+          $WORKSPACE/devstack/stack.sh
+          rc=$?
+
+          if [[ $rc -ne 0 ]]; then
+              java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+              echo "FINISHED with ERROR $rc: ############## $phase  ###################"
+              exit $rc
+          fi
+          echo "############## Stack is up and running ###################"
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: stop-stacksh
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="STOP-STACKSH"
+          echo "STARTED: ############## $phase  ###################"
+
+          #For latest Ubuntu
+          export FORCE=yes
+          $WORKSPACE/devstack/unstack.sh
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Ironic-IB-API
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-IRONIC-IB-API"
+            echo "STARTED: ############## $phase  ###################"
+            cd /opt/stack/tempest
+            tests=ironic_tempest_plugin.tests.api
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Ironic-IB-configure-Real-BM
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-IRONIC-IB-configure-Real-BM"
+            echo "STARTED: ############## $phase  ###################"
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Ironic-IB-run-Real-BM
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-IRONIC-IB-run-Real-BM"
+            echo "STARTED: ############## $phase  ###################"
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+
+
+
+- builder:
+    name: run-tests-Neutron-ML2-MLNX
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-NEUTRON-ML2-MLNX"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(tempest.api.network.admin.test_dhcp
+                tempest.api.network.admin.test_agent
+                tempest.api.network.test_floating_ips
+                tempest.api.network.test_networks
+                tempest.api.network.test_extensions
+                #tempest.scenario.test_network_basic_ops
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
+                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
+                #tempest.scenario.test_network_advanced_server_ops
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_pause_unpause
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_reboot
+            )
+            cd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Neutron-ML2-Sriov-API
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-Neutron-ML2-Sriov-API"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(tempest.api.network.admin.test_dhcp
+                tempest.api.network.admin.test_agent
+                tempest.api.network.test_floating_ips
+                tempest.api.network.test_networks
+                tempest.api.network.test_routers
+                tempest.api.network.test_extensions
+            )
+            cd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Neutron-Networking-MLNX-ML2
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-NEUTRON-NETWORKING-MLNX-ML2"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(tempest.api.network.admin.test_dhcp
+                tempest.api.network.admin.test_agent
+                tempest.api.network.test_floating_ips
+                tempest.api.network.test_networks
+                tempest.api.network.test_extensions
+                tempest.scenario.test_network_basic_ops
+                tempest.scenario.test_network_advanced_server_ops
+                )
+            pushd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-network-basic
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-NETWORK-BASIC"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(
+                tempest.scenario.test_network_basic_ops
+            )
+            pushd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-network-advanced
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-NETWORK-ADVANCED"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(
+                tempest.scenario.test_network_advanced_server_ops
+            )
+            pushd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: run-tests-Nova-ML2-Sriov-API
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-Nova-ML2-Sriov-API"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(
+                tempest.api.compute.servers.test_server_personality
+                tempest.api.compute.servers.test_virtual_interfaces_negative
+                tempest.api.compute.servers.test_list_server_filters
+                tempest.api.compute.servers.test_multiple_create_negative
+                tempest.api.compute.servers.test_server_metadata
+                tempest.api.compute.servers.test_attach_interfaces
+                tempest.api.compute.servers.test_server_addresses_negative
+                tempest.api.compute.servers.test_availability_zone
+                tempest.api.compute.servers.test_server_group
+                tempest.api.compute.servers.test_server_password
+                tempest.api.compute.servers.test_create_server
+                tempest.api.compute.servers.test_multiple_create
+                tempest.api.compute.servers.test_servers_negative
+                tempest.api.compute.servers.test_virtual_interfaces
+                tempest.api.compute.servers.test_server_metadata_negative
+                tempest.api.compute.servers.test_server_actions
+                tempest.api.compute.servers.test_servers
+                tempest.api.compute.servers.test_instance_actions
+                tempest.api.compute.servers.test_server_addresses
+                tempest.api.compute.servers.test_list_servers_negative
+                tempest.api.compute.servers.test_instance_actions_negative
+                tempest.api.compute.servers.test_disk_config
+                tempest.api.compute.certificates.test_certificates
+                tempest.api.compute.flavors.test_flavors_negative
+                tempest.api.compute.flavors.test_flavors
+                tempest.api.compute.test_authorization
+                tempest.api.compute.volumes.test_volumes_negative
+                tempest.api.compute.test_live_block_migration
+                tempest.api.compute.images.test_image_metadata_negative
+                tempest.api.compute.images.test_images_oneserver
+                tempest.api.compute.images.test_image_metadata
+                tempest.api.compute.images.test_list_image_filters_negative
+                tempest.api.compute.images.test_images_oneserver_negative
+                tempest.api.compute.images.test_images_negative
+                tempest.api.compute.images.test_list_images
+                tempest.api.compute.images.test_list_image_filters
+                tempest.api.compute.images.test_images
+                tempest.api.compute.admin.test_security_groups
+                tempest.api.compute.admin.test_flavors_access_negative
+                tempest.api.compute.admin.test_flavors_negative
+                tempest.api.compute.admin.test_flavors_extra_specs
+                tempest.api.compute.admin.test_flavors_extra_specs_negative
+                tempest.api.compute.admin.test_simple_tenant_usage_negative
+                tempest.api.compute.admin.test_availability_zone
+                tempest.api.compute.admin.test_quotas_negative
+                tempest.api.compute.admin.test_hosts_negative
+                tempest.api.compute.admin.test_fixed_ips_negative
+                tempest.api.compute.admin.test_fixed_ips
+                tempest.api.compute.admin.test_hosts
+                tempest.api.compute.admin.test_services_negative
+                tempest.api.compute.admin.test_instance_usage_audit_log_negative
+                tempest.api.compute.admin.test_availability_zone_negative
+                tempest.api.compute.admin.test_aggregates
+                tempest.api.compute.admin.test_aggregates_negative
+                tempest.api.compute.admin.test_networks
+                tempest.api.compute.admin.test_simple_tenant_usage
+                tempest.api.compute.admin.test_servers_negative
+                tempest.api.compute.admin.test_hypervisor
+                tempest.api.compute.admin.test_servers
+                tempest.api.compute.admin.test_quotas
+                tempest.api.compute.admin.test_flavors_access
+                tempest.api.compute.admin.test_floating_ips_bulk
+                tempest.api.compute.admin.test_security_group_default_rules
+                tempest.api.compute.admin.test_hypervisor_negative
+                tempest.api.compute.admin.test_instance_usage_audit_log
+                tempest.api.compute.admin.test_services
+                tempest.api.compute.admin.test_baremetal_nodes
+                tempest.api.compute.admin.test_migrations
+                tempest.api.compute.admin.test_agents
+                tempest.api.compute.admin.test_flavors
+                tempest.api.compute.limits.test_absolute_limits_negative
+                tempest.api.compute.limits.test_absolute_limits
+                tempest.api.compute.test_extensions
+                tempest.api.compute.test_live_block_migration_negative
+                tempest.api.compute.floating_ips.test_list_floating_ips
+                tempest.api.compute.floating_ips.test_floating_ips_actions
+                tempest.api.compute.floating_ips.test_floating_ips_actions_negative
+                tempest.api.compute.floating_ips.test_list_floating_ips_negative
+                tempest.api.compute.floating_ips.base
+                tempest.api.compute.test_networks
+                tempest.api.compute.keypairs.test_keypairs_negative
+                tempest.api.compute.keypairs.test_keypairs
+                tempest.api.compute.test_quotas
+                tempest.api.compute.test_tenant_networks
+                tempest.api.compute.security_groups.base
+            )
+            tests=(
+                tempest.api.compute.servers.test_server_actions.ServerActionsTestJSON.test_resize_server_confirm
+                tempest.api.compute.servers.test_server_actions.ServerActionsTestJSON.test_resize_server_revert
+                )
+
+            pushd /opt/stack/tempest
+            testr init
+            testr list-tests ${tests[@]}
+            testr run ${tests[@]}
+            test_pass=$?
+            if [[ $test_pass -ne 0 ]]; then
+                java -jar $WORKSPACE/os-ext-testing/tools/jenkins-cli.jar -s $JENKINS_URL set-build-result failure
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: collect-artifacts
+    builders:
+      - shell: |
+          #!/bin/bash -eEx
+          phase="COLLECT-ARTIFACTS"
+          echo "STARTED: ############## $phase  ###################"
+          dmesg > $WORKSPACE/ci-artifacts/logs/dmesg.log
+
+          testrepository=/opt/stack/tempest/.testrepository/0
+          if [[ -f $testrepository ]]; then
+              pushd /opt/stack/tempest/.testrepository
+              tmp_subunit=/tmp/tempest_results_$$
+              for file in `find . -regex '.*[0-9][0-9]?'`
+                  do cat $file >> $tmp_subunit
+              done
+              $WORKSPACE/os-ext-testing/tools/subunit2html.py $tmp_subunit $WORKSPACE/ci-artifacts/testr_results.html
+              rm -f $tmp_subunit
+              popd
+          fi
+
+          source=/tmp/ci-artifacts_$$
+          rsync $WORKSPACE/ci-artifacts/* $source -a --copy-links -v 2>&1|tee > /dev/null
+          rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
+
+          grep -rn Traceb $source/logs/*.log 2>&1|tee > $source/logs/exceptions.txt
+
+          gzip -9 -r $source 2>&1|tee > /dev/null
+          rm -rf $WORKSPACE/ci-artifacts
+          UPLOAD_LOGPATH=${LOG_PATH:-${JOB_NAME}_${BUILD_NUMBER}}
+          REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f1`
+
+          cp -r $source $WORKSPACE/ci-artifacts
+          chmod +r -R $WORKSPACE/ci-artifacts
+          rm -rf $source
+
+          target=/var/www/html/ci-artifacts/$UPLOAD_LOGPATH
+          ssh $LOGSERVER mkdir -p $target
+          ssh $LOGSERVER rm -rf $target/*
+          scp -r $WORKSPACE/ci-artifacts/* $LOGSERVER:$target > /dev/null 2>&1
+          echo "Detailed logs: http://$LOGSERVER/ci-artifacts/$UPLOAD_LOGPATH"
+          ip=$(echo $LOGSERVER | cut -d'@' -f2)
+          echo "http://$ip/ci-artifacts/$UPLOAD_LOGPATH"
+          echo "https://review.openstack.org/#/c/$REVIEW_PATH"
+
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: produce-readme-file
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          if [ ! -d $LOGDIR ];then
+          mkdir -p $LOGDIR
+          fi
+          cat > $LOGDIR/README <<EOF
+          Mellanox 3rd party CI
+          ---------------------
+          Job Name: $JOB_NAME
+          Build started at `date --universal`
+
+          Contact information:
+          Email: lennyb@mellanox.com
+          IRC: lennyb on #openstack-infra
+          EOF
+
+- builder:
+    name: clone-devstack
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CLONE-DEVSTACK"
+          echo "STARTED: ############## $phase  ###################"
+
+          devstack_repo=git://git.openstack.org/openstack-dev/devstack
+          retries=10
+          if [[ ! -d $WORKSPACE/devstack ]];then
+              git clone $devstack_repo
+          fi
+          pushd $WORKSPACE/devstack
+
+          ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
+          git fetch
+          git checkout $ZUUL_BRANCH
+
+          git pull
+          #clean unstaged and ignored files from devstack
+          git clean -d -f -x
+          #workaround remove old cloud.yaml to avoid keystone auth problems
+          rm -rf ~/.config/openstack
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: add-mac-nova
+    builders:
+        - shell: |
+            #!/bin/bash
+            #Prepare  environment
+
+            phase="ADD-MAC-NOVA"
+            echo "STARTED: ############## $phase  ###################"
+            WORKSPACE=${WORKSPACE:-$(dirname `readlink -f -- $0`)}
+            echo "WORKSPACE=$WORKSPACE"
+
+            source $WORKSPACE/devstack/openrc admin
+
+            # Start script to add macs to default gateway
+            echo "NOVA CI add macs"
+            ADD_MAC='/tmp/add_mac.sh'
+            mlnx_port=`ip link show |grep -a2 vf |head -n1 |awk '{print $2}' |tr -d :`
+            sudo ifconfig $mlnx_port up
+            sudo ovs-vsctl --may-exist add-port br-$mlnx_port $mlnx_port
+            cat <<EOF > $ADD_MAC
+            #!/bin/bash
+            #This script adds MACs to the physical interface
+            source \$WORKSPACE/devstack/openrc
+            while [ 1 ]; do
+                macs=\`neutron port-list |awk '{print \$5}' |grep fa |egrep -v "\"10.0|\"172."\`
+                for mac in \$macs; do
+                    sudo bridge fdb add \$mac dev $mlnx_port
+                    done
+                done
+            EOF
+
+            nohup bash $ADD_MAC 2>&1|tee > /dev/null &
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: delete-mac-nova
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="DELETE_MAC_NOVA"
+            echo "STARTED: ############## $phase  ###################"
+            ADD_MAC='/tmp/add_mac.sh'
+            echo "NOVA CI clean macs"
+            sudo kill -9 `ps aux | grep $ADD_MAC | awk '{print $2}'` 2>&1|tee > /dev/null
+            rm -f $ADD_MAC 2>&1|tee > /dev/null
+
+            mlnx_port=`ip link show |grep -a2 vf |head -n1 |awk '{print $2}' |tr -d :`
+            echo "mlnx_port=$mlnx_port"
+            mlnx_port=${mlnx_port:-'ib0'}
+
+            #This script removes all MACs from the phisical interface
+            macs=`sudo bridge fdb show |grep fa:16 | awk '{print $1}'`
+            echo "Removing following macs $macs"
+            for mac in $macs; do
+                sudo bridge fdb del $mac dev $mlnx_port 2>&1|tee > /dev/null
+            done
+            echo "FINISHED: ############## $phase  ###################"
+
+
+
+

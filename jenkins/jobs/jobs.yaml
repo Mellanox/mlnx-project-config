@@ -1,0 +1,286 @@
+- job-template:
+    name: 'Nova-ML2-Sriov'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - delete-mac-nova # remove macs
+      - 'run-tests-{name}-API'
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-basic
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-advanced
+      - delete-mac-nova # remove macs
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-MACVTAP-ML2-Sriov'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-Nova-MACVTAP-ML2-Sriov
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-basic
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-advanced
+      - delete-mac-nova # remove macs
+      # Configure port Direct
+      # Currently not supported by cirros image
+      #- configure-tempest-direct
+      #- add-mac-nova # workaround to add mac to the bridge
+      #- run-tests-network-advanced
+      #- delete-mac-nova # remove macs
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log #This line must be the last one
+
+
+
+
+- job-template:
+    name: 'Tempest-Sriov'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-basic
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-advanced
+      - delete-mac-nova # remove macs
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log #This line must be the last one
+
+- job-template:
+    name: 'Neutron-ML2-MLNX'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - 'run-tests-{name}'
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log  #This line must be the last one
+
+
+- job-template:
+    name: 'Neutron-ML2-Sriov'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - delete-mac-nova # remove macs
+      #- 'run-tests-{name}-API'
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-basic
+      - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-network-advanced
+      - delete-mac-nova # remove macs
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log  #This line must be the last one
+
+- job-template:
+    name: 'Neutron-Networking-MLNX-ML2'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - 'run-tests-{name}'
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log  #This line must be the last one
+
+
+- job-template:
+    name: 'Ironic-IB'
+    node: '{node}'
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - check-environment
+      - os-ext-testing
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack-{name}
+      - 'run-tests-{name}-API'
+      #- 'run-tests-{name}-configure-Real-BM'
+      #- 'run-tests-{name}-run-Real-BM'
+      - produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: GermanServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log  #This line must be the last one
+
+
+- job:
+    name: 'NOOP'
+    node: SLAVE_SRIOV
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=144.76.193.39
+            LOGSERVER=mlnx_logger@$EXT_SERVER
+      - noop-run
+      - produce-readme-file
+
+

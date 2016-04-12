@@ -1,0 +1,21 @@
+- builder:
+    name: upload-console-log
+    builders:
+      - collect-config-files
+      - stop-stacksh
+      - collect-artifacts
+      - shell: |
+          #!/bin/bash -ex
+          nohup $WORKSPACE/os-ext-testing/tools/grab_console_log.sh > /dev/null &
+
+- publisher:
+    name: upload-console-log
+    publishers:
+      - postbuildscript:
+          builders:
+            - upload-console-log
+              # These flags really mean only if on * when
+              # checked. When both set to false the post script
+              # should run on every job regardless of status.
+          onfailure: False
+          onsuccess: False
