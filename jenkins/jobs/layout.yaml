@@ -20,35 +20,9 @@ pipelines:
         verified: 0
     merge-failure:
       smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
+        to: lennyb@mellanox.com
+        from: zuul
         subject: Upstream {change} failed Mellanox Neutron CI merge
-
-
-  - name: check-cinder
-    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
-    failure-message: Build failed. To re-run the job please post a comment with 'recheck cinder-mlnx'.
-    footer-message: To re-run the job post 'recheck cinder-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
-    manager: IndependentPipelineManager
-    precedence: low
-    trigger:
-      gerrit:
-        - event: patchset-created
-        - event: change-restored
-        - event: comment-added
-          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( cinder-mlnx))\s*$
-#Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: 0
-    merge-failure:
-      smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
-        subject: Upstream {change} failed Mellanox Cinder CI merge
 
 
   - name: check-nova
@@ -72,8 +46,8 @@ pipelines:
         verified: 0
     merge-failure:
       smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
+        to: lennyb@mellanox.com
+        from: lennyb@mellanox.com
         subject: Upstream {change} failed Mellanox Nova CI merge
 
   - name: check-ironic-ib
@@ -97,8 +71,8 @@ pipelines:
 #        verified: 0
 #    merge-failure:
 #      smtp:
-#        to: openstack_ci@mellanox.com
-#        from: zuul@10.224.33.37
+#        to: lennyb@mellanox.com
+#        from: lennyb@mellanox.com
 #        subject: Upstream {change} failed Mellanox Nova CI merge
 
 
@@ -123,8 +97,8 @@ pipelines:
         verified: 0
     merge-failure:
       smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
+        to: lennyb@mellanox.com
+        from: lennyb@mellanox.com
         subject: Upstream {change} failed Mellanox Tempest CI merge
 
   - name: check-networking-mlnx
@@ -140,16 +114,16 @@ pipelines:
         - event: comment-added
           comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( networking-mlnx))\s*$
 #Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: -1
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: -1
     merge-failure:
       smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
+        to: lennyb@mellanox.com
+        from: lennyb@mellanox.com
         subject: Upstream {change} failed Mellanox Networking CI merge
 
 
@@ -173,8 +147,8 @@ pipelines:
         verified: 0
     merge-failure:
       smtp:
-        to: openstack_ci@mellanox.com
-        from: zuul@10.224.33.37
+        to: lennyb@mellanox.com
+        from: lennyb@mellanox.com
         subject: Upstream {change} failed Mellanox Neutron CI merge
 
 
@@ -293,14 +267,9 @@ jobs:
 
   - name: NOOP
     voting: false
-
-  - name: Cinder-ISER-ISCSI
-    voting: true
-    branch: ^(master|stable/kilo|stable/liberty|stable/mitaka).*$
-
-  - name: Cinder-ISER-LIO
-    voting: true
-    branch: ^(master|stable/kilo|stable/liberty|stable/mitaka).*$
+    skip-if:
+      - all-files-match-any:
+         - ^.*\.py$
 
 
 projects:
@@ -326,18 +295,8 @@ projects:
     check-ironic-ib:
         - Ironic-IB
 
-  - name: openstack-dev/ci-sandbox
+  - name: openstack-dev/sandbox
     check-sandbox:
       - NOOP
-
-  - name: openstack/cinder
-    check-cinder:
-      - Cinder-ISER-ISCSI
-
-  - name: openstack/os-brick
-    check-cinder:
-      - Cinder-ISER-ISCSI
-
-
 
 

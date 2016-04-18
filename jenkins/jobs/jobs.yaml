@@ -6,10 +6,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -17,7 +20,7 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - delete-mac-nova # remove macs
-      - 'run-tests-{name}-API'
+      #- 'run-tests-{name}-API'
       - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
       - delete-mac-nova # remove macs
@@ -31,9 +34,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log #This line must be the last one
@@ -47,10 +50,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            IMAGE_SERVER=13.69.151.247     
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -77,9 +83,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log #This line must be the last one
@@ -95,10 +101,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -119,9 +128,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log #This line must be the last one
@@ -134,10 +143,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -152,9 +164,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log  #This line must be the last one
@@ -168,10 +180,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -193,9 +208,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log  #This line must be the last one
@@ -208,10 +223,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -226,9 +244,9 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log  #This line must be the last one
@@ -242,10 +260,13 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
       - check-environment
-      - os-ext-testing
+      - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
@@ -263,24 +284,146 @@
           recipients: lennyb@mellanox.com
           subject: Failed Mellanox CI {name}
           failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/ci-artifacts/$LOG_PATH/\nhttp://$EXT_SERVER/ci-artifacts/$JOB_NAME_$BUILD_NUMBER"
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - build-publisher:
-          name: GermanServer
+          name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
       - upload-console-log  #This line must be the last one
 
 
-- job:
+- job-template:
     name: 'NOOP'
-    node: SLAVE_SRIOV
+    node: '{node}'
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=144.76.193.39
-            LOGSERVER=mlnx_logger@$EXT_SERVER
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
       - noop-run
       - produce-readme-file
 
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log #This line must be the last one
 
+
+- job-template:
+    name: 'Cinder-ISER-ISCSI'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247 
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - run-tests-cinder
+      - produce-readme-file
+    publishers:
+      - email-ext:
+          recipients: mlnx-openstack-ci@dev.mellanox.co.il
+          subject: cinder job is being failed, please debug
+          failure: true
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log
+    wrappers:
+      - timeout:
+          timeout: 320
+          fail: true
+
+
+- job-template:
+    name: 'Cinder-ISER-LIO'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh # Running Devstack
+      - run-tests-cinder
+      - produce-readme-file
+    publishers:
+      - email-ext:
+          recipients: mlnx-openstack-ci@dev.mellanox.co.il
+          subject: cinder job is being failed, please debug
+          failure: true
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log
+    wrappers:
+      - timeout:
+          timeout: 320
+          fail: true
+
+- job-template:
+    name: 'Debian-networking-mlnx-build'
+    triggers:
+      - timed: '@daily'
+      - pollurl:
+          cron: 'H * * * *'
+          urls:
+            - url: 'https://mitaka-jessie.pkgs.mirantis.com/job/networking-mlnx/lastBuild/'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - mlnx-debian-build
+      #- produce-readme-file
+
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      #- upload-console-log #This line must be the last one

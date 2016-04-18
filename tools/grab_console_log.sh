@@ -21,8 +21,6 @@ while ! egrep -q "Finished: " $log_file; do
     if [ $TRIES -gt $RETRY_LIMIT ]; then
         break
     fi
-    ssh r-dcs16-vm03 sync
-    sleep 3
     # -X POST because Jenkins doesn't do partial gets properly when
     #         job is running.
     # --data start=X instructs Jenkins to mimic a partial get using
@@ -47,5 +45,5 @@ sync
 arch=${log_file}.gz
 sudo rm -rf $arch
 gzip -9 -r $log_file 2>&1|tee >/dev/null
-scp $arch $LOGSERVER://var/www/html/ci-artifacts/${LOG_PATH:-${JOB_NAME}_${BUILD_NUMBER}}
+scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}_${BUILD_NUMBER}}
 rm -rf $arch $log_dir

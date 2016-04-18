@@ -6,7 +6,7 @@
       - collect-artifacts
       - shell: |
           #!/bin/bash -ex
-          nohup $WORKSPACE/os-ext-testing/tools/grab_console_log.sh > /dev/null &
+          nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
 
 - publisher:
     name: upload-console-log
