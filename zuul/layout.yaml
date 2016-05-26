@@ -140,12 +140,12 @@ pipelines:
         - event: comment-added
           comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( networking-mlnx))\s*$
 #Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: -1
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: -1
     merge-failure:
       smtp:
         to: openstack_ci@mellanox.com

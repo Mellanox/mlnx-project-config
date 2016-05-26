@@ -32,12 +32,16 @@
             phase="COLLECT CONFIG FILES"
             mkdir -p $WORKSPACE/ci-artifacts/logs
             mkdir -p $WORKSPACE/ci-artifacts/etc
+            mkdir -p $WORKSPACE/ci-artifacts/env
 
-            pip freeze > $WORKSPACE/ci-artifacts/etc/pip-freeze.txt
-            env > $WORKSPACE/ci-artifacts/etc/environment.txt
-            ifconfig > $WORKSPACE/ci-artifacts/etc/ifconfig.txt
-            sudo ovs-vsctl show > $WORKSPACE/ci-artifacts/etc/ovs-vsctl.txt
-            sudo lspci|grep Mellanox > $WORKSPACE/ci-artifacts/etc/lspci.txt
+            pip freeze > $WORKSPACE/ci-artifacts/env/pip-freeze.txt
+            dpkg --list > $WORKSPACE/ci-artifacts/env/dpkg.txt
+            env > $WORKSPACE/ci-artifacts/env/environment.txt
+            ifconfig > $WORKSPACE/ci-artifacts/env/ifconfig.txt
+            sudo ovs-vsctl show > $WORKSPACE/ci-artifacts/env/ovs-vsctl.txt
+            sudo lspci|grep Mellanox > $WORKSPACE/ci-artifacts/env/lspci.txt
+            sudo uname -a > $WORKSPACE/ci-artifacts/env/uname.txt
+
             sudo cp /etc/modprobe.d/ml* $WORKSPACE/ci-artifacts/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -76,7 +80,6 @@
 
             sudo dpkg --configure -a
             sudo dmesg -c > /dev/null
-            sudo pip install six 
 
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
@@ -85,8 +88,11 @@
                 $WORKSPACE/devstack/clean.sh
             fi
 
-            #sudo apt-get remove rabbitmq-server -y
-            sudo apt-get remove openvswitch-switch -y
+            #if [ -f /etc/redhat-release ];then
+            #    yum remove openvswitch-switch -y
+            #else
+            #    sudo apt-get remove openvswitch-switch -y
+            #fi
 
             sudo kill `pgrep rabbitmq`
             sudo kill `pgrep beam.smp`
@@ -105,13 +111,13 @@
               sudo pip uninstall -r $file -y 2>&1|tee > /dev/null
             done
 
-            sudo apt-get autoremove -y
 
             sudo pip install setuptools==20.1.1
             sudo pip install pbr
             sudo pip install eventlet
-            sudo apt-get install openvswitch-switch -y
-            sudo apt-get remove python-requests -y
+            sudo pip install six
+
+            sudo yum install python-requests rabbitmq-server -y
 
             [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
             if [[ -n $ZUUL_PROJECT ]]; then
@@ -162,7 +168,6 @@
                 git clean -d -f -x
                 popd
             done
-            popd
 
             echo "FINISHED:############## $phase  ###################"
 
@@ -201,15 +206,15 @@
                 fi
             done
 
+            sudo modprobe ib_isert 2>&1|tee > /dev/null
+            sudo modprobe ib_iser 2>&1|tee > /dev/null
+
 - builder:
     name: apply-workarounds-post-stack-Ironic-IB
     builders:
         - shell: |
             #!/bin/bash -x
             phase="APPLY-WORKAROUNDS-POST-Ironic-IB"
-            #cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py /opt/stack/tempest/tempest/api/baremetal/admin/test_ports.py
-            #cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py /opt/stack/ironic/ironic_tempest_plugin/tests/api/admin/test_ports.py
-            #cp /.autodirect/mtrswgwork/lennyb/work/CloudX/Mellanox/ironic/ironic_tempest_plugin/config.py /opt/stack/ironic/ironic_tempest_plugin/config.py
 
             #update
             #/opt/stack/nova/nova/virt/ironic/client_wrapper.py
@@ -232,19 +237,6 @@
           fi
 
           echo "Hello World"
-
-- builder:
-    name: configure-tempest-direct
-    builders:
-      - shell: |
-          #!/bin/bash -ex
-          phase="CONFIGURE-TEMPEST-DIRECT"
-          sudo cp /opt/stack/tempest/etc/tempest.conf $WORKSPACE/ci-artifacts/tempest_macvtap.conf
-          sudo crudini --set /opt/stack/tempest/etc/tempest.conf network port_vnic_type direct
-          #mlnx_port=`ip link show |grep -a2 vf |head -n1 |awk '{print $2}' |tr -d :`
-          #for vf in `ip link show p1p1 | grep vf | awk '{print $2}'`; do
-          #    sudo ip link set $mlnx_port vf $vf mac 00:00:00:00:00:01
-          #done
 
 - builder:
     name: configure-devstack-Neutron-ML2-MLNX
@@ -899,8 +891,8 @@
               export ${project^^}_BRANCH=$refspec
           fi
           #For latest Ubuntu
-          export FORCE=yes
-          if [ -z $ZUUL_BRANCH ] && $ZUUL_BRANCH == 'stable/kilo' ];then
+          #export FORCE=yes
+          if [ -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/kilo' ];then
               export ESWITCHD_BRANCH="0.14"
           else
               export ESWITCHD_BRANCH="master"
@@ -926,7 +918,7 @@
           echo "STARTED: ############## $phase  ###################"
 
           #For latest Ubuntu
-          export FORCE=yes
+          #export FORCE=yes
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
              $WORKSPACE/devstack/unstack.sh
           fi
@@ -1226,7 +1218,7 @@
     name: collect-artifacts
     builders:
       - shell: |
-          #!/bin/bash -eE
+          #!/bin/bash -eEx
           phase="COLLECT-ARTIFACTS"
           echo "STARTED: ############## $phase  ###################"
           dmesg > $WORKSPACE/ci-artifacts/logs/dmesg.log
@@ -1253,8 +1245,8 @@
 
           gzip -9 -r $source 2>&1|tee > /dev/null
           rm -rf $WORKSPACE/ci-artifacts
-          UPLOAD_LOGPATH=${LOG_PATH:-${JOB_NAME}_${BUILD_NUMBER}_${NODE_NAME}}
-          REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f2`
+          UPLOAD_LOGPATH=ci-artifacts/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}
+          REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f3`
 
           cp -r $source $WORKSPACE/ci-artifacts
           chmod +r -R $WORKSPACE/ci-artifacts
@@ -1312,11 +1304,7 @@
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
           git fetch
           git checkout $ZUUL_BRANCH
-
-          #git pull
-          git fetch https://git.openstack.org/openstack-dev/devstack refs/changes/55/311055/1 && git checkout FETCH_HEAD
-          #clean unstaged and ignored files from devstack
-          git clean -d -f -x
+          git pull
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
           echo "FINISHED: ############## $phase  ###################"
@@ -1399,14 +1387,14 @@
 
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
-          HOST_IP=$(host $(hostname) | cut -d ' ' -f4)
+          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           SERVICE_TOKEN=servicetoken
 
-          LIBS_FROM_GIT=os-brick
+          #LIBS_FROM_GIT=os-brick
           RECLONE=yes
           #PIP_UPGRADE=True
 
@@ -1436,6 +1424,7 @@
           iscsi_ip_address=1.1.1.1
           iscsi_helper=tgtadm
           iscsi_protocol = iser
+          iscsi_port = 3260
           volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
           volume_backend_name = backend1
           volume_group = stack-volumes-lvmdriver-1
@@ -1444,6 +1433,7 @@
           iscsi_ip_address=1.1.1.1
           iscsi_helper=tgtadm
           iscsi_protocol = iser
+          iscsi_port = 3260
           volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
           volume_backend_name = backend2
           volume_group = stack-volumes-lvmdriver-1
@@ -1474,7 +1464,7 @@
 
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
-          HOST_IP=$(host $(hostname) | cut -d ' ' -f4)
+          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -1483,7 +1473,7 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
 
-          LIBS_FROM_GIT=os-brick
+          #LIBS_FROM_GIT=os-brick
           RECLONE=yes
           #PIP_UPGRADE=True
 
@@ -1513,6 +1503,7 @@
           [lvmdriver-1]
           iscsi_ip_address=1.1.1.1
           iscsi_helper=lioadm
+          iscsi_port = 3261
           volume_group = stack-volumes-lvmdriver-1
           iscsi_protocol = iser
           volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
@@ -1523,6 +1514,7 @@
           iscsi_ip_address=1.1.1.1
           iscsi_helper=lioadm
           iscsi_protocol = iser
+          iscsi_port = 3261
           volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
           volume_backend_name = backend1
           volume_group = stack-volumes-lvmdriver-1
@@ -1531,6 +1523,7 @@
           iscsi_ip_address=1.1.1.1
           iscsi_helper=lioadm
           iscsi_protocol = iser
+          iscsi_port = 3261
           volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
           volume_backend_name = backend2
           volume_group = stack-volumes-lvmdriver-1

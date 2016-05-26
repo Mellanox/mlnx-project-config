@@ -70,12 +70,6 @@
       - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
-      # Configure port Direct
-      # Currently not supported by cirros image
-      #- configure-tempest-direct
-      #- add-mac-nova # workaround to add mac to the bridge
-      #- run-tests-network-advanced
-      #- delete-mac-nova # remove macs
       - produce-readme-file
 
     publishers:
@@ -426,4 +420,3 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
-      #- upload-console-log #This line must be the last one
