@@ -45,5 +45,5 @@ sync
 arch=${log_file}.gz
 sudo rm -rf $arch
 gzip -9 -r $log_file 2>&1|tee >/dev/null
-scp $arch $LOGSERVER://var/www/html/ci-artifacts/${LOG_PATH:-${JOB_NAME}_${BUILD_NUMBER}}
+scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}
 rm -rf $arch $log_dir

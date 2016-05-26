@@ -186,7 +186,6 @@ jobs:
       - all-files-match-any:
           - ^.*\.rst$
           - ^doc/.*$
-          - ^neutron/tests/.*$
           - ^neutron/db/.*$
           - ^tools/.*$
           - ^tox.ini$
@@ -210,7 +209,6 @@ jobs:
       - all-files-match-any:
           - ^.*\.rst$
           - ^doc/.*$
-          - ^neutron/tests/.*$
           - ^neutron/db/.*$
           - ^tools/.*$
           - ^tox.ini$
@@ -333,10 +331,12 @@ projects:
   - name: openstack/cinder
     check-cinder:
       - Cinder-ISER-ISCSI
+      - Cinder-ISER-LIO
 
   - name: openstack/os-brick
     check-cinder:
       - Cinder-ISER-ISCSI
+      - Cinder-ISER-LIO
 
 
 
