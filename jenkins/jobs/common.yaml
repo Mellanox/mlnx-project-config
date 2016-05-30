@@ -1246,7 +1246,7 @@
           gzip -9 -r $source 2>&1|tee > /dev/null
           rm -rf $WORKSPACE/ci-artifacts
           UPLOAD_LOGPATH=${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}
-          REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f3`
+          REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f2`
 
           cp -r $source $WORKSPACE/ci-artifacts
           chmod +r -R $WORKSPACE/ci-artifacts

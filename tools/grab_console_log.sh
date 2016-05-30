@@ -21,6 +21,7 @@ while ! egrep -q "Finished: " $log_file; do
     if [ $TRIES -gt $RETRY_LIMIT ]; then
         break
     fi
+    sleep 3
     # -X POST because Jenkins doesn't do partial gets properly when
     #         job is running.
     # --data start=X instructs Jenkins to mimic a partial get using
