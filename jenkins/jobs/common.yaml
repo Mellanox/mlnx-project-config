@@ -36,6 +36,7 @@
 
             pip freeze > $WORKSPACE/ci-artifacts/env/pip-freeze.txt
             dpkg --list > $WORKSPACE/ci-artifacts/env/dpkg.txt
+            sudo lvs > $WORKSPACE/ci-artifacts/env/lvs.txt
             env > $WORKSPACE/ci-artifacts/env/environment.txt
             ifconfig > $WORKSPACE/ci-artifacts/env/ifconfig.txt
             sudo ovs-vsctl show > $WORKSPACE/ci-artifacts/env/ovs-vsctl.txt
@@ -85,14 +86,17 @@
 
             if [ -d $WORKSPACE/devstack ]; then
                 echo "Cleaning up possible remainings of previous builds."
-                $WORKSPACE/devstack/clean.sh
+                $WORKSPACE/devstack/clean.sh 2>&1|tee > /dev/null
             fi
 
-            #if [ -f /etc/redhat-release ];then
-            #    yum remove openvswitch-switch -y
-            #else
-            #    sudo apt-get remove openvswitch-switch -y
-            #fi
+            #Check Cinder leftovers
+            if [ $(echo $JOB_NAME|grep Cinder) ]; then
+                echo "Cleaning Cinder left volumes"
+                sudo pip install rtslib_fb
+                sudo lvs
+                $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
+                sudo service tgt restart > /dev/null 2>&1 || true
+            fi
 
             sudo kill `pgrep rabbitmq`
             sudo kill `pgrep beam.smp`
@@ -104,13 +108,11 @@
 
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
 
-            sudo service tgt restart > /dev/null 2>&1 || true
 
             for file in `ls /opt/stack/*/requirements.txt`
             do
               sudo pip uninstall -r $file -y 2>&1|tee > /dev/null
             done
-
 
             sudo pip install setuptools==20.1.1
             sudo pip install pbr
@@ -133,7 +135,6 @@
                     [ ! -d /proc/$pid ] && sudo ipcrm -s $sem
                 done
             done
-
 
             #echo killing all python procs
             retries=10
@@ -920,7 +921,7 @@
           #For latest Ubuntu
           #export FORCE=yes
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
-             $WORKSPACE/devstack/unstack.sh
+             $WORKSPACE/devstack/unstack.sh 2>&1|tee > /dev/null
           fi
           echo "FINISHED: ############## $phase  ###################"
 

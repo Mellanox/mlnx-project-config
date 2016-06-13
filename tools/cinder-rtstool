@@ -1,0 +1,634 @@
+#!/usr/bin/python
+# vim: et tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2012 - 2013 Red Hat, Inc.
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+import gettext
+import re
+import sys
+
+import rtslib_fb as rtslib
+
+gettext.install('cinder-rtstool', unicode=1)
+
+
+class RtstoolError(Exception):
+    pass
+
+
+class RtstoolImportError(RtstoolError):
+    pass
+
+def set_iser(portal):
+    if hasattr(portal, "_set_iser_attr"):
+        portal._set_iser_attr(1)
+    elif hasattr(portal, "_set_iser"):
+        portal._set_iser(1)
+    else:
+        raise RtstoolError('Could not set iser')
+
+def byte_size(size_str):
+    if size_str.isdigit():
+        return int(size_str)
+    elif size_str.endswith('B'):
+        return int(size_str.rstrip('B'))
+    elif size_str.endswith('K'):
+        return int(size_str.rstrip('K')) * 1024
+    elif size_str.endswith('M'):
+        return int(size_str.rstrip('M')) * 1048576
+    elif size_str.endswith('G'):
+        return int(size_str.rstrip('G')) * 1073741824
+    else:
+        raise RtstoolError('Could not parse size %s' % size_str)
+
+def create_rd_mcp_storage(bs_index, mode, dev_name, disk_size):
+    backstore = None
+    so_new = None
+    if 'RDMCPBackstore' in rtslib.__dict__.keys():
+        backstore = rtslib.RDMCPBackstore(bs_index, mode=mode)
+        try:
+            so_new = rtslib.RDMCPStorageObject(backstore,
+                                               name=dev_name,
+                                               size=disk_size,
+                                               wwn = True, nullio = True)
+        except rtslib.utils.RTSLibError:
+            backstore.delete()
+            print('Could not create rd_mcp storage object')
+            raise
+    else:
+        try:
+            so_new = rtslib.RDMCPStorageObject(name=dev_name,
+                                               size=byte_size(disk_size),
+                                               wwn = True, nullio = True)
+        except rtslib.utils.RTSLibError:
+            print('Could not create rd_mcp storage object')
+            raise
+    return so_new
+
+def create(backing_device, dev_name, target_name, transport, userid, password, \
+                       host_ips = '0.0.0.0', port = 3260, \
+                       dev_type = 'file', disk_size = 100, \
+                       signature = False, initiator_iqns = None, pi_type = 1, index = 1):
+
+    try:
+        rtsroot = rtslib.root.RTSRoot()
+    except rtslib.utils.RTSLibError:
+        print('Ensure that configfs is mounted at /sys/kernel/config.')
+        raise
+    # Look to see if BlockStorageObject already exists
+    for x in rtsroot.storage_objects:
+        if x.name == target_name or x.name == dev_name:
+            # Already exists, use this one
+            print("%s or %s already exist. Exit." % target_name, dev_name)
+            return
+    bs_index = index # FIXME: unknown ?! value .. should be 0..250
+    if dev_type == 'file':
+        backstore = rtslib.FileIOBackstore(bs_index,mode='any')
+        try:
+            so_new = rtslib.FileIOStorageObject(backstore, name=dev_name, \
+                             dev=backing_device, size=disk_size, wwn = True, \
+                             buffered_mode = True)
+        except rtslib.utils.RTSLibError:
+            backstore.delete()
+            print('Could not create fileio storage object')
+            raise
+    elif dev_type == 'rd_mcp':
+        so_new = create_rd_mcp_storage(bs_index, 'any', dev_name, disk_size)
+    else:
+        backstore = rtslib.IBlockBackstore(bs_index, mode='any')
+        try:
+            so_new = rtslib.IBlockStorageObject(backstore, name=dev_name, \
+                                             dev=backing_device, wwn = True)
+        except rtslib.utils.RTSLibError:
+            backstore.delete()
+            print('Could not create block storage object')
+            raise
+    # if signature should be supported - set signature related parameters
+    if signature:
+        so_new.set_attribute('pi_prot_type', pi_type)
+        if dev_type == 'file':
+            so_new.set_attribute('pi_prot_format', '1')
+    # Create an iSER target endpoint using an iSCSI IQN
+    target_new = rtslib.Target(rtslib.FabricModule('iscsi'), target_name, 'any')
+
+    # Setup a network portal in the iSER TPG
+    # The IP address must already be active on the system
+    tpg_index = 1 # FIXME: unknown ?! value .. should be 0..250
+    tpg_new = rtslib.TPG(target_new, tpg_index, mode='create')
+    auth_attr = '0'
+    if userid != 'None':
+        auth_attr = '1'
+    tpg_new.set_attribute('authentication', auth_attr)
+    tpg_new.set_attribute('demo_mode_write_protect', '0')
+    gen_node_acls = '1'
+    if initiator_iqns:
+        gen_node_acls = '0'
+    tpg_new.set_attribute('generate_node_acls', gen_node_acls)
+    tpg_new.set_attribute('cache_dynamic_acls', '1')
+    if signature:
+        tpg_new.set_attribute('t10_pi', '1')
+        tpg_new.set_parameter('InitialR2T', 'Yes')
+        tpg_new.set_parameter('ImmediateData', 'No')
+
+    lun_index = 0 # FIXME: unknown ?! value .. should be 0..250
+    lun_new = rtslib.LUN(tpg_new, lun_index, storage_object=so_new)
+
+    initiator_name = None
+    name_file = '/etc/iscsi/initiatorname.iscsi'
+
+    try:
+        with open(name_file, 'r') as f:
+            for line in f:
+                m = re.match('InitiatorName=(.+)', line)
+                if m != None:
+                    initiator_name = m.group(1)
+                    break
+    except IOError:
+        raise RtstoolError('Could not open %s' % name_file)
+
+    if initiator_name == None:
+        raise RtstoolError('Could not read InitiatorName from %s' %
+                           name_file)
+
+    acl_new = rtslib.NodeACL(tpg_new, initiator_name, mode='create')
+
+    if userid != 'None':
+        acl_new.chap_userid = userid
+        acl_new.chap_password = password
+
+    rtslib.MappedLUN(acl_new, lun_new.lun, lun_new.lun)
+
+    if initiator_iqns:
+        initiator_iqns = initiator_iqns.strip(' ')
+        for i in initiator_iqns.split(','):
+            acl_new = rtslib.NodeACL(tpg_new, i, mode='create')
+            if userid != 'None':
+                acl_new.chap_userid = userid
+                acl_new.chap_password = password
+
+            rtslib.MappedLUN(acl_new, lun_new.lun, lun_new.lun)
+
+    tpg_new.enable = 1
+
+    portals = []
+    try:
+        host_ips_list = host_ips.split(",")
+        for host_ip_value in host_ips_list:
+            portal = rtslib.NetworkPortal(tpg_new, host_ip_value, int(port), mode='any')
+            portals.append(portal)
+    except rtslib.utils.RTSLibError:
+        print('Error creating NetworkPortal: ensure port %s '
+                'is not in use by another service.' % str(port))
+        raise
+    # enable iser as transport protocol
+    # default value for transport is tcp
+    try:
+        if transport.upper() == 'ISER':
+            for portal in portals:
+                set_iser(portal)
+    except rtslib.utils.RTSLibError:
+        print('Error set ISER as default transport protocol')
+        raise
+
+    try:
+        rtslib.NetworkPortal(tpg_new, '::0', 3260, mode='any')
+    except rtslib.utils.RTSLibError:
+        # TODO(emh): Binding to IPv6 fails sometimes -- let pass for now.
+        pass
+
+def add_initiator(target_iqn, initiator_iqn, userid, password):
+    try:
+        rtsroot = rtslib.root.RTSRoot()
+    except rtslib.utils.RTSLibError:
+        print('Ensure that configfs is mounted at /sys/kernel/config.')
+        raise
+
+    # Look for the target
+    target = None
+    for t in rtsroot.targets:
+        if t.wwn == target_iqn:
+            target = t
+            break
+    if target == None:
+        raise RtstoolError('Could not find target %s' % target_iqn)
+
+    tpg = target.tpgs[0] # get the first one
+    for acl in tpg._list_node_acls():
+        # See if this ACL configuration already exists
+        if acl.node_wwn == initiator_iqn:
+            # No further action required
+            return
+
+    acl_new = rtslib.NodeACL(tpg, initiator_iqn, mode='create')
+    if userid != 'None':
+        acl_new.chap_userid = userid
+        acl_new.chap_password = password
+
+    rtslib.MappedLUN(acl_new, 0, tpg_lun=0)
+
+
+def add_lun(target_name, backing_device, d_name, dev_type, disk_size):
+    """
+    Created backstore device and create lun with this device to target
+    @param target_name: Target name
+    @param backing_device: Device
+    @param d_name: namne for device
+    @param dev_type: device type
+    """
+    try:
+        rtsroot = rtslib.root.RTSRoot()
+    except rtslib.utils.RTSLibError:
+        print('Ensure that configfs is mounted at /sys/kernel/config.')
+        raise
+
+    # Look to see if BlockStorageObject already exists
+    for x in rtsroot.storage_objects:
+        if x.name == d_name:
+            # Already exists, use this one
+            print("%s already exist. Exit." % d_name)
+            return
+    bs_plugin = 'fileio'
+    if dev_type != 'file':
+        bs_plugin = 'iblock'
+
+    bs_index = max([i._index for i in rtsroot._list_backstores()]) + 1
+    if dev_type == 'file':
+        backstore = rtslib.FileIOBackstore(bs_index,mode='any')
+        try:
+            so_new = rtslib.FileIOStorageObject(backstore, name=d_name, \
+                             dev=backing_device, size=disk_size, wwn = True)
+        except:
+            backstore.delete()
+            raise
+    elif dev_type == 'rd_mcp':
+        pass
+    else:
+        backstore = rtslib.IBlockBackstore(bs_index, mode='any')
+        try:
+            so_new = rtslib.IBlockStorageObject(backstore, name=d_name, \
+                                             dev=backing_device, wwn = True)
+        except:
+            backstore.delete()
+            raise
+
+    tpg = None
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name:
+            tpg = x
+            break
+    if tpg:
+        lun_index = max([i._lun for i in tpg._list_luns()]) + 1
+        lun = rtslib.LUN(tpg, lun_index, storage_object=so_new)
+    else:
+        raise RtstoolError('Could not find target %s' % target_name)
+
+def set_target_attribute(target_name, attribute, value):
+    """
+    Not implementable - only tpgs have attributes
+    @param target_name:
+    @param attribute:
+    @param value:
+    """
+    rtsroot = rtslib.root.RTSRoot()
+    return []
+
+def get_target_parameters(target_name):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+        if x.wwn ==  target_name:  
+            return x.list_parameters()
+
+def get_target_attributes(target_name):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+        if x.wwn ==  target_name:  
+            return x.list_attributes()
+
+def set_tpg_attribute(target_name, attribute, value, tpg_tag = 0):
+    if attribute not in get_tpg_attributes(target_name, tpg_tag):
+        print "Set TPG Attribute: Bad attribute name"
+        return False
+    rtsroot = rtslib.root.RTSRoot()
+    tpg_obj = None
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            tpg_obj = x
+            break
+    if tpg_obj:
+        try:
+            tpg_obj.set_attribute(attribute, value)
+        except rtslib.utils.RTSLibError:
+            print('Error setting attribute %s  value  %s for target %s ' %
+                  attribute, str(value),target_name )
+            raise
+        return True
+    else:
+        print "Set TPG Attribute: TPG object not found"
+        return False
+
+def set_tpg_parameter(target_name, parameter, value, tpg_tag = 0):
+    if parameter not in get_tpg_parameters(target_name, tpg_tag):
+        print "Set TPG Parameter: Bad parameter name"
+        return False
+    rtsroot = rtslib.root.RTSRoot()
+    tpg_obj = None
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            tpg_obj = x
+            break
+    if tpg_obj:
+        try:
+            tpg_obj.set_parameter(parameter, value)
+        except rtslib.utils.RTSLibError:
+            print('Error setting parameter %s  value  %s for target %s ' %
+                  attribute, str(value),target_name )
+            raise
+        return True
+    else:
+        print "Set TPG Parameter: TPG object not found"
+        return False
+
+def get_tpg_attributes(target_name, tpg_tag = 0):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            return x.list_attributes()
+
+def get_tpg_parameters(target_name, tpg_tag = 0):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            return x.list_parameters()
+
+def get_target_attribute_value(target_name, attribute):
+    #rtsroot = rtslib.root.RTSRoot()
+    pass
+
+def get_target_parameter_value(target_name, attribute):
+    #rtsroot = rtslib.root.RTSRoot()
+    pass
+
+def get_tpg_attribute_value(target_name, attribute, tpg_tag = 0):
+    rtsroot = rtslib.root.RTSRoot()
+    tpg_obj = None
+    attr_value = None
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            tpg_obj = x
+            break
+    if tpg_obj:
+        try:
+            attr_value = tpg_obj.get_attribute(attribute)
+        except rtslib.utils.RTSLibError:
+            print('Error getting attribute %s  value for target %s ' % \
+                  (attribute, target_name) )
+            raise
+    else:
+        print "Get TPG Parameter: TPG object not found"
+    return attr_value
+
+def get_tpg_parameter_value(target_name, parameter, tpg_tag = 0 ):
+    rtsroot = rtslib.root.RTSRoot()
+    tpg_obj = None
+    param_value = None
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name and \
+            (tpg_tag == 0 or x._tag == tpg_tag):
+            tpg_obj = x
+            break
+    if tpg_obj:
+        try:
+            param_value = tpg_obj.get_parameter(parameter)
+        except rtslib.utils.RTSLibError:
+            print('Error getting parameter %s  value for target %s ' % \
+                  (parameter, target_name) )
+            raise    
+    else:
+        print "Get TPG Parameter: TPG object not found"
+    return param_value
+
+def get_target_tpgs(target_name):
+    tpgs = []
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.tpgs:
+        if x._parent_target.wwn == target_name:
+            tpgs.append(x)
+    return tpgs
+
+def enable_tpg(tpg_tag):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.tpgs:
+        if x._get_tag() == tpg_tag:
+            x.enable = 1
+            break
+
+def disable_tpg(tpg_tag):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.tpgs:
+        if x._get_tag() == tpg_tag:
+            x.enable = 0
+            break
+
+def get_targets():
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+        print x.wwn
+
+def get_targets_list():
+    targets_list = []
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+       targets_list.append(x)
+    return  targets_list
+
+def clean_rtslib():
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+        x.delete()
+
+    for x in rtsroot.storage_objects:
+        x.delete()
+
+def delete(iqn):
+    rtsroot = rtslib.root.RTSRoot()
+    for x in rtsroot.targets:
+        if x.wwn == iqn:
+            x.delete()
+            break
+
+    for x in rtsroot.storage_objects:
+        if x.name == iqn:
+            x.delete()
+            break
+
+def verify_rtslib():
+    for member in ['IBlockStorageObject', 'FabricModule', 'LUN',
+                   'MappedLUN', 'NetworkPortal', 'NodeACL', 'root',
+                   'Target', 'TPG']:
+        if not hasattr(rtslib, member):
+            raise RtstoolImportError("rtslib is missing member %s: "
+                                       "You may need a newer python-rtslib." %
+                                     member)
+
+def usage():
+    print("Usage: ")
+    print(sys.argv[0] +
+          "create [device] [dev_name] [name] [transport] [host_ips] " +
+          "[port] [userid] [password] [backend_type] [disk_size] " +
+          "[signature] [pi_type] <initiator_iqn,iqn2,iqn3,...>")
+    print(sys.argv[0] +
+          " add-initiator [target_iqn] [userid] [password] [initiator_iqn]")
+    print(sys.argv[0] +
+          " add-lun [target_iqn] [device] [name] " +
+          "[backend_type] [disk_size]")
+    print(sys.argv[0] + " get-targets")
+    print(sys.argv[0] + " get-target-params-list [target_name]")
+    print(sys.argv[0] + " get-target-param [target_name] [param_name]")
+    print(sys.argv[0] + " get-target-attr-list [target_name]")
+    print(sys.argv[0] + " get-target-attr [target_name] [attr_name]")
+    print(sys.argv[0] + " set-target-param [target_name] [param_name] [value]")
+    print(sys.argv[0] + " set-target-attr [target_name] [attr_name] [value]")
+    print(sys.argv[0] + " delete [iqn]")
+    print(sys.argv[0] + " clean")
+    print(sys.argv[0] + " verify")
+    sys.exit(1)
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    if len(argv) < 2:
+        usage()
+
+    if argv[1] == 'create':
+        if len(argv) < 6:
+            usage()
+
+        if len(argv) > 15:
+            usage()
+
+        backing_device = argv[2]
+        dev_name = argv[3]
+        name = argv[4]
+        transport = argv[5]
+        host_ips = argv[6]
+        port = argv[7]
+        userid = argv[8]
+        password = argv[9]
+        backend_type= argv[10]
+        disk_size = argv[11]
+        signature = argv[12]
+        pi_type = argv[13]
+        index = argv[14]
+        initiator_iqns = None
+        signature = True if signature == "True" else False
+
+        if len(argv) > 15:
+            initiator_iqns = argv[15]
+
+        if backing_device.startswith("null"):
+            backing_device = "/dev/" + backing_device 
+
+        create(backing_device, dev_name, name, transport, userid, password, \
+			   host_ips, port, backend_type, disk_size, signature, \
+               initiator_iqns, pi_type, index)
+
+    elif argv[1] == 'add-initiator':
+        if len(argv) < 6:
+            usage()
+
+        target_iqn = argv[2]
+        userid = argv[3]
+        password = argv[4]
+        initiator_iqn = argv[5]
+
+        add_initiator(target_iqn, initiator_iqn, userid, password)
+
+    elif argv[1] == 'add-lun':
+        if len(argv) < 6:
+            usage()
+
+        target_iqn = argv[2]
+        device = argv[3]
+        device_name = argv[4]
+        backend_type = argv[5]
+        disk_size = argv[6]
+
+        add_lun(target_iqn, device, device_name, backend_type, disk_size)
+
+    elif argv[1] == 'get-targets':
+        get_targets()
+
+    elif argv[1] == 'delete':
+        if len(argv) < 3:
+            usage()
+
+        iqn = argv[2]
+        delete(iqn)
+
+    elif argv[1] == 'verify':
+        # This is used to verify that this script can be called by cinder,
+        # and that rtslib is new enough to work.
+        verify_rtslib()
+        return 0
+
+    elif argv[1] == 'clean':
+        clean_rtslib()
+        return 0
+    elif argv[1] == 'get-target-params-list':
+        target_name = argv[2]
+        parameters_list = get_tpg_parameters(target_name)
+        for param in parameters_list:
+            print param
+    elif argv[1] == 'get-target-param':
+        target_name = argv[2]
+        param_name = argv[3]
+        param_value = get_tpg_parameter_value(target_name, param_name)
+        print param_value
+    elif argv[1] == 'get-target-attr-list':
+        target_name = argv[2]
+        attrs_list = get_tpg_attributes(target_name)
+        for attr in attrs_list:
+            print attr
+    elif argv[1] == 'get-target-attr':
+        target_name = argv[2]
+        attr_name = argv[3]
+        attr_value = get_tpg_attribute_value(target_name, attr_name)
+        print attr_value
+    elif argv[1] == 'set-target-param':
+        target_name = argv[2]
+        param_name = argv[3]
+        param_value = argv[4]
+        rc = set_tpg_parameter(target_name, param_name, param_value)
+        return 0
+    elif argv[1] == 'set-target-attr':
+        target_name = argv[2]
+        attr_name = argv[3]
+        attr_value = argv[4]
+        rc = set_tpg_attribute(target_name, attr_name, attr_value)
+        return 0
+    else:
+        usage()
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
