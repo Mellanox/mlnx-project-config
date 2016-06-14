@@ -94,7 +94,7 @@
                 echo "Cleaning Cinder left volumes"
                 sudo pip install rtslib_fb
                 sudo lvs
-                $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
+                sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
                 sudo service tgt restart > /dev/null 2>&1 || true
             fi
 
