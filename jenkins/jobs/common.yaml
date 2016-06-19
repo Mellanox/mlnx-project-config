@@ -34,7 +34,8 @@
             mkdir -p $WORKSPACE/ci-artifacts/etc
             mkdir -p $WORKSPACE/ci-artifacts/env
 
-            pip freeze > $WORKSPACE/ci-artifacts/env/pip-freeze.txt
+            pip --version
+            pip freeze 2>&1 | tee > $WORKSPACE/ci-artifacts/env/pip-freeze.txt
             dpkg --list > $WORKSPACE/ci-artifacts/env/dpkg.txt
             sudo lvs > $WORKSPACE/ci-artifacts/env/lvs.txt
             env > $WORKSPACE/ci-artifacts/env/environment.txt
@@ -118,6 +119,7 @@
             sudo pip install pbr
             sudo pip install eventlet
             sudo pip install six
+            sudo pip install jinja2
 
             sudo yum install python-requests rabbitmq-server -y
 
@@ -210,6 +212,7 @@
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
 
+
 - builder:
     name: apply-workarounds-post-stack-Ironic-IB
     builders:
@@ -283,7 +286,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -366,7 +368,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -431,7 +432,6 @@
           SWIFT_ENABLE_TEMPURLS=True
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           RECLONE=yes
-          #PIP_UPGRADE=True
           USE_SCREEN=True
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
@@ -576,7 +576,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -661,7 +660,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -739,7 +737,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -817,7 +814,6 @@
           LOGFILE=$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          #PIP_UPGRADE=True
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -1395,9 +1391,8 @@
           SERVICE_PASSWORD=password
           SERVICE_TOKEN=servicetoken
 
-          #LIBS_FROM_GIT=os-brick
+          LIBS_FROM_GIT=os-brick
           RECLONE=yes
-          #PIP_UPGRADE=True
 
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -1474,9 +1469,8 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
 
-          #LIBS_FROM_GIT=os-brick
+          LIBS_FROM_GIT=os-brick
           RECLONE=yes
-          #PIP_UPGRADE=True
 
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
