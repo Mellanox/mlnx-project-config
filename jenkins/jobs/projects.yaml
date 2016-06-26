@@ -84,4 +84,30 @@
     jobs:
         - 'Debian-networking-mlnx-build'
 
+- project:
+    name: Nova-ML2-Sriov-Multinode-Controller
+    github-org: openstack-dev
+    node: SRIOV_MN_CONTROLLER
+    jobs:
+        - 'Nova-ML2-Sriov-Multinode-Controller'
 
+- project:
+    name: Nova-ML2-Sriov-Multinode-Compute
+    github-org: openstack-dev
+    node: SRIOV_MN_COMPUTE
+    jobs:
+        - 'Nova-ML2-Sriov-Multinode-Compute'
+
+- project:
+    name: Nova-ML2-Sriov-Multinode-Tempest
+    github-org: openstack-dev
+    node: SRIOV_MN_CONTROLLER
+    jobs:
+        - 'Nova-ML2-Sriov-Multinode-Tempest'
+
+- project:
+    name: Nova-ML2-Sriov-Multinode-StopCompute
+    github-org: openstack-dev
+    node: SRIOV_MN_COMPUTE
+    jobs:
+        - 'Nova-ML2-Sriov-Multinode-StopCompute'

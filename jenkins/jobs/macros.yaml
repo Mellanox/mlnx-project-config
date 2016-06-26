@@ -19,3 +19,24 @@
               # should run on every job regardless of status.
           onfailure: False
           onsuccess: False
+
+- publisher:
+    name: upload-console-log-mn
+    publishers:
+      - postbuildscript:
+          builders:
+              - collect-config-files
+              - collect-artifacts
+              - shell: |
+                  #!/bin/bash -ex
+                  env > $WORKSPACE/grub_console.log
+                  #cat $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh >> $WORKSPACE/grub_console.log
+                  cat $WORKSPACE/grab_console_log.sh >> $WORKSPACE/grub_console.log
+                  #export NODE_TYPE=$NODE_TYPE
+                  nohup $WORKSPACE/grab_console_log.sh > /dev/null &
+                  #nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
+              # These flags really mean only if on * when
+              # checked. When both set to false the post script
+              # should run on every job regardless of status.
+          onfailure: False
+          onsuccess: False

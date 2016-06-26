@@ -53,7 +53,7 @@
             EXT_SERVER=13.69.151.247
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247     
+            IMAGE_SERVER=13.69.151.247
             PATH=$PATH:/usr/sbin
       - check-environment
       - mlnx-project-config
@@ -327,7 +327,7 @@
             EXT_SERVER=13.69.151.247
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247 
+            IMAGE_SERVER=13.69.151.247
             PATH=$PATH:/usr/sbin
       - check-environment
       - mlnx-project-config
@@ -420,3 +420,149 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
+
+######################################################
+###               MULTI NODE CI     ##################
+######################################################
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Controller'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack
+        #- noop-run
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Compute'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack
+        #- noop-run
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Tempest'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - mlnx-project-config
+      - run-tests-multinode
+      - stop-stacksh
+        #- noop-run
+
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-StopCompute'
+    node: '{node}'
+    parameters:
+    builders:
+       - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+       - stop-stacksh
+         #- noop-run
+
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+- job:
+    name: Nova-ML2-Sriov-Multinode
+    project-type: multijob
+    node:  NO_SRIOV
+    builders:
+       - multijob:
+           name: Controller
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Controller
+                current-parameters: true
+       - multijob:
+           name: Compute
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Compute
+                current-parameters: true
+                predefined-parameters: CONTROLLER_NODE=cloudx-22
+       - multijob:
+           name: Tempest
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Tempest
+                current-parameters: true
+       - multijob:
+           name: StopCompute
+           condition: ALWAYS
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-StopCompute
+                current-parameters: true
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+ 

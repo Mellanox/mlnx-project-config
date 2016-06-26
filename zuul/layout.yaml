@@ -288,6 +288,21 @@ jobs:
       - '^tempest/common/.*$'
       - '^tempest/.*$'
 
+  - name: Nova-ML2-Sriov-Multinode
+    branch: master
+    voting: false
+    skip-if:
+      - all-files-match-any:
+          - ^.*\.rst$
+          - ^doc/.*$
+          - ^nova/tests/.*$
+          - ^nova/virt/baremetal/.*$
+          - ^nova/virt/hyperv/.*$
+          - ^nova/virt/ironic/.*$
+          - ^nova/virt/vmwareapi/.*$
+          - ^nova/virt/xenapi/.*$
+          - ^tools/.*$
+          - ^tox.ini$
 
   - name: NOOP
     voting: false
@@ -315,6 +330,7 @@ projects:
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
+      #- Nova-ML2-Sriov-Multinode
 
   - name: openstack/tempest
     check-sriov-tempest:
