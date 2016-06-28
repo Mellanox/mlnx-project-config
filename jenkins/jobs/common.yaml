@@ -889,11 +889,7 @@
           fi
           #For latest Ubuntu
           #export FORCE=yes
-          if [ -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/kilo' ];then
-              export ESWITCHD_BRANCH="0.14"
-          else
-              export ESWITCHD_BRANCH="master"
-          fi
+          export ESWITCHD_BRANCH="master"
 
           $WORKSPACE/devstack/stack.sh
           rc=$?
