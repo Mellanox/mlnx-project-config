@@ -304,6 +304,8 @@ jobs:
           - ^tools/.*$
           - ^tox.ini$
 
+
+
   - name: NOOP
     voting: false
 
@@ -330,19 +332,19 @@ projects:
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
-      #- Nova-ML2-Sriov-Multinode
+#      - Nova-ML2-Sriov-Multinode
 
-  - name: openstack/tempest
-    check-sriov-tempest:
-      - Tempest-Sriov
+#  - name: openstack/tempest
+#    check-sriov-tempest:
+#      - Tempest-Sriov
 
-  - name: openstack/ironic
-    check-ironic-ib:
-        - Ironic-IB
+#  - name: openstack/ironic
+#    check-ironic-ib:
+#        - Ironic-IB
 
-  - name: openstack-dev/ci-sandbox
-    check-sandbox:
-      - NOOP
+#  - name: openstack-dev/ci-sandbox
+#    check-sandbox:
+#        - NOOP
 
   - name: openstack/cinder
     check-cinder:

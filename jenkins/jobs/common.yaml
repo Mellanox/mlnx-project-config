@@ -105,13 +105,15 @@
             fi
 
 
-            sudo kill `pgrep rabbitmq`
-            sudo kill `pgrep beam.smp`
-            sudo kill `ps -ef |grep swift | grep pyth | awk '{print $2}'`
-
-            sudo kill -9 `pgrep rabbitmq`
-            sudo kill -9 `pgrep beam.smp`
-            sudo kill -9 `ps -ef |grep swift | grep pyth | awk '{print $2}'`
+            sudo kill $(pgrep rabbitmq)
+            sudo kill $(pgrep beam.smp)
+            sudo kill $(ps -ef |grep swift | grep pyth | awk '{print $2}')
+            sleep 5
+            sudo kill -9 $(pgrep rabbitmq)
+            sudo kill -9 $(pgrep beam.smp)
+            sudo kill -9 $(ps -ef |grep swift | grep pyth | awk '{print $2}')
+            sudo kill -9 $(ps -ef |grep neutron-openvswitch-agent | grep -v grep | awk '{print $2}')
+            kill -9 $(ps -ef |grep add_mac | grep -v grep | awk '{print $2}') 2>&1|tee > /dev/null
 
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
 
@@ -256,9 +258,13 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Neutron-ML2-MLNX"
           echo "STARTED: ############## $phase  ###################"
-          ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
-          export NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
-          if [ $NETWORKING_MLNX_BRANCH != 'master' ]; then
+          if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
+              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+          fi
+
+          ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
+
+          if [ $ZUUL_BRANCH != 'master' ]; then
               export MLNX_DRIVER='mlnx'
           else
               export MLNX_DRIVER='mlnx_infiniband'
@@ -286,8 +292,9 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
           epioib_port=$epioib_port
-          NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
+          NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -358,6 +365,9 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION=fdb
+          fi
           cat >  $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -370,6 +380,8 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          EXTENSION=${EXTENSION:-fdb}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -410,6 +422,10 @@
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
+          [agent]
+          extensions=$EXTENSION
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           [network]
@@ -544,11 +560,15 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Neutron-Networking-MLNX-ML2"
           echo "STARTED: ############## $phase  ###################"
+          if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
+              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+          fi
+
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
-          echo "ZUUL_BRANCH=$ZUUL_BRANCH"
-          export NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-$ZUUL_BRANCH}
+
           echo "NETWORKING_MLNX_BRANCH=$NETWORKING_MLNX_BRANCH"
-          if [ $NETWORKING_MLNX_BRANCH != 'master' ]; then
+
+          if [ "$ZUUL_BRANCH" != 'master' ]; then
               export MLNX_DRIVER='sdnmechdriver,mlnx'
           else
               export MLNX_DRIVER='mlnx_sdn_assist,mlnx_infiniband'
@@ -577,6 +597,7 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           epioib_port=$epioib_port
+          PUBLIC_INTERFACE=$mlnx_port
           NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
@@ -619,10 +640,12 @@
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [sdn]
-          url = http://127.0.0.1:5001/
+          url = http://127.0.0.1/neo
           domain = cloudx
           username = admin
           password = admin
+          [ovs]
+          of_interface=ovs-ofctl
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           resize=false
@@ -651,6 +674,9 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION=fdb
+          fi
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -663,6 +689,8 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          EXTENSION=${EXTENSION:-fdb}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -703,7 +731,11 @@
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
-          supported_pci_vendor_devs = 15b3:1014
+          supported_pci_vendor_devs=15b3:1014
+          [agent]
+          extensions=$EXTENSION
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           [network]
@@ -728,6 +760,9 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION=fdb
+          fi
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -740,6 +775,8 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          EXTENSION=${EXTENSION:-fdb}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -781,6 +818,10 @@
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
+          [agent]
+          extensions=$EXTENSION
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           [network]
@@ -805,6 +846,9 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION=fdb
+          fi
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -817,6 +861,8 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          EXTENSION=${EXTENSION:-fdb}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -858,6 +904,10 @@
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
+          [agent]
+          extensions=$EXTENSION
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           #suspend=False
@@ -895,6 +945,7 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -978,6 +1029,7 @@
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
           LOGFILE=$LOGDIR/stack.sh.log
@@ -1151,7 +1203,7 @@
                 tempest.api.network.test_networks
                 tempest.api.network.test_extensions
                 #tempest.scenario.test_network_basic_ops
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
                 #LNY TOFIX test_router_rescheduling works on old Ubuntu CI
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
@@ -1230,7 +1282,16 @@
             phase="RUN-TESTS-NETWORK-BASIC"
             echo "STARTED: ############## $phase  ###################"
             tests=(
-                tempest.scenario.test_network_basic_ops
+                #tempest.scenario.test_network_basic_ops
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_hotplug_nic
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_port_security_macspoofing_port
+                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_subnet_details
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_instance_port_admin_state
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
             )
             pushd /opt/stack/tempest
             testr init
@@ -1423,7 +1484,7 @@
     name: collect-artifacts
     builders:
       - shell: |
-          #!/bin/bash -eEx
+          #!/bin/bash -eE
           phase="COLLECT-ARTIFACTS"
           echo "STARTED: ############## $phase  ###################"
           CI_ARTIFACTS=$(dirname ${LOGDIR})
@@ -1472,6 +1533,7 @@
 
           ip=$(echo $LOGSERVER | cut -d'@' -f2)
           echo "Detailed logs: http://$ip/$UPLOAD_LOGPATH"
+          echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/testr_results.html.gz"
 
           if [ ! -z "$LOG_PATH" ]; then
               REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f2`
@@ -1530,11 +1592,13 @@
         - shell: |
             #!/bin/bash
             #Prepare  environment
-
             phase="ADD-MAC-NOVA"
             echo "STARTED: ############## $phase  ###################"
             WORKSPACE=${WORKSPACE:-$(dirname `readlink -f -- $0`)}
             echo "WORKSPACE=$WORKSPACE"
+            if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
+                exit 0
+            fi
 
             source $WORKSPACE/devstack/openrc admin
 
@@ -1544,13 +1608,10 @@
             HCA=${HCA:-"mlx4"}
             mlnx_port=`ibdev2netdev |grep $HCA|grep Up | awk '{print $5}' | head -n1`
             echo "Adding macs to $HCA:$mlnx_port"
-            sudo ifconfig $mlnx_port up
-            sudo ovs-vsctl --may-exist add-port br-$mlnx_port $mlnx_port
 
             cat <<EOF > $ADD_MAC
             #!/bin/bash
             #This script adds MACs to the physical interface
-            source $WORKSPACE/devstack/openrc
             while [ 1 ]; do
                 macs=\`neutron port-list |awk '{print \$5}' |grep fa |egrep -v "\"10.0|\"172."\`
                 for mac in \$macs; do
@@ -1569,10 +1630,13 @@
             #!/bin/bash
             phase="DELETE_MAC_NOVA"
             echo "STARTED: ############## $phase  ###################"
+            if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
+                exit 0
+            fi
             ADD_MAC='/tmp/add_mac.sh'
             HCA=${HCA:-"mlx4"}
             echo "NOVA CI clean macs"
-            sudo kill -9 `ps aux | grep $ADD_MAC | awk '{print $2}'` 2>&1|tee > /dev/null
+            kill -9 $(ps -ef |grep add_mac | grep -v grep | awk '{print $2}') 2>&1|tee > /dev/null
             rm -f $ADD_MAC 2>&1|tee > /dev/null
 
             mlnx_port=`ibdev2netdev |grep $HCA|grep Up | awk '{print $5}' | head -n1`
