@@ -334,6 +334,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${epioib_port}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth
           disable_service h-eng h-api h-api-cfn h-api-cw
@@ -421,6 +422,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-novnc n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
@@ -636,6 +638,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-${epioib_port}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
@@ -728,6 +731,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
@@ -814,6 +818,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
@@ -900,6 +905,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
@@ -992,6 +998,7 @@
           VNCSERVER_LISTEN=\$HOST_IP
           VNCSERVER_PROXYCLIENT_ADDRESS=\$VNCSERVER_LISTEN
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-qos,q-sriov-agt
           enable_plugin neutron git://git.openstack.org/openstack/neutron
@@ -1067,6 +1074,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
           ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
@@ -1366,11 +1374,8 @@
             echo "STARTED: ############## $phase  ###################"
             tests=(
                   #TOFIX tests fail unless nova sch is restarted. Seems that sch ignoring schedule_hints
-                  #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_same_host
-                  #tempest.scenario.test_server_migrate.TestServerMultinode.test_migrate_nodes
-                  #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts_with_list_of_servers
-                  #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
+                  tempest.scenario.test_server_migrate.TestServerMultinode.test_migrate_nodes
                   tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration
             )
             pushd /opt/stack/tempest
