@@ -223,6 +223,20 @@
             sudo pip install urllib3 --upgrade
 
 - builder:
+    name: apply-workarounds-tempest
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="APPLY-WORKAROUNDS-POST-TEMPEST"
+            echo "STARTED: ############## $phase  ###################"
+            cd /opt/stack/tempest
+            git fetch https://git.openstack.org/openstack/tempest refs/changes/47/335447/11 && git cherry-pick FETCH_HEAD
+            git fetch https://git.openstack.org/openstack/tempest refs/changes/30/339230/2 && git cherry-pick FETCH_HEAD
+
+
+
+
+- builder:
     name: apply-workarounds-post-stack-Ironic-IB
     builders:
         - shell: |
@@ -482,8 +496,6 @@
 
           # microversion patch
           #enable_plugin ironic https://github.com/openstack/ironic refs/changes/58/260358/6
-
-          #TEMPEST_BRANCH=refs/changes/07/292307/6
 
           NOVA_BRANCH=refs/changes/40/266540/11
           enable_plugin ironic https://github.com/openstack/ironic refs/changes/63/264263/24
@@ -1059,7 +1071,6 @@
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
           enable_plugin neutron git://git.openstack.org/openstack/neutron
-          TEMPEST_BRANCH=refs/changes/47/335447/5
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1070,9 +1081,14 @@
           [ml2_sriov]
           agent_required=True
           supported_pci_vendor_devs = 15b3:1004, 15b3:1014
+          [agent]
+          extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           suspend=False
+          migrate=True
           [compute]
           min_compute_nodes=2
           [network]
@@ -1352,9 +1368,10 @@
                   #TOFIX tests fail unless nova sch is restarted. Seems that sch ignoring schedule_hints
                   #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_same_host
                   #tempest.scenario.test_server_migrate.TestServerMultinode.test_migrate_nodes
-                  tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts_with_list_of_servers
-                  tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts
+                  #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts_with_list_of_servers
+                  #tempest.api.compute.admin.test_servers_on_multinodes.ServersOnMultiNodesTest.test_create_servers_on_different_hosts
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration
             )
             pushd /opt/stack/tempest
             testr init
@@ -1581,6 +1598,7 @@
           git fetch
           git checkout $ZUUL_BRANCH
           git pull
+
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
           echo "FINISHED: ############## $phase  ###################"

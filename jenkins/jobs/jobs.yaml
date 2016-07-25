@@ -445,6 +445,7 @@
       - configure-devstack-{name}
       - run-stacksh
       - apply-workarounds-post-stack
+      - apply-workarounds-tempest
         #- noop-run
     publishers:
       - build-publisher:
@@ -533,7 +534,7 @@
 - job:
     name: Nova-ML2-Sriov-Multinode
     project-type: multijob
-    node:  NO_SRIOV
+    node:  master
     builders:
        - multijob:
            name: Controller

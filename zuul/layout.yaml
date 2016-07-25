@@ -24,6 +24,31 @@ pipelines:
         from: zuul@10.224.33.37
         subject: Upstream {change} failed Mellanox Neutron CI merge
 
+  - name: check-mlnx-multinode
+    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
+    failure-message: Build failed. To re-run the job please post a comment with 'recheck multinode-mlnx'.
+    footer-message: To re-run the job post 'recheck multinode-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
+    manager: IndependentPipelineManager
+    precedence: low
+    trigger:
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( multinode-mlnx))\s*$
+#Remark for silent mode
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox MultiNode CI merge
+
 
   - name: check-cinder
     description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
@@ -332,6 +357,7 @@ projects:
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
+#    check-mlnx-multinode:
 #      - Nova-ML2-Sriov-Multinode
 
 #  - name: openstack/tempest
