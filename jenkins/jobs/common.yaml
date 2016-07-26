@@ -274,6 +274,8 @@
           echo "STARTED: ############## $phase  ###################"
           if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
               export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+          else
+              export NETWORKING_MLNX_BRANCH=$ZUUL_BRANCH
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
@@ -499,6 +501,8 @@
           # microversion patch
           #enable_plugin ironic https://github.com/openstack/ironic refs/changes/58/260358/6
 
+          #TEMPEST_BRANCH=refs/changes/07/292307/6
+
           NOVA_BRANCH=refs/changes/40/266540/11
           enable_plugin ironic https://github.com/openstack/ironic refs/changes/63/264263/24
           enable_plugin ironic-inspector https://github.com/openstack/ironic-inspector refs/changes/57/264257/22
@@ -576,6 +580,8 @@
           echo "STARTED: ############## $phase  ###################"
           if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
               export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+          else
+              export NETWORKING_MLNX_BRANCH=$ZUUL_BRANCH
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
@@ -611,7 +617,7 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           epioib_port=$epioib_port
-          PUBLIC_INTERFACE=$mlnx_port
+          PUBLIC_INTERFACE=$epioib_port
           NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
           # Logging
           LOGDIR=${LOGDIR:-/opt/stack/logs}
@@ -1283,8 +1289,16 @@
                 tempest.api.network.test_floating_ips
                 tempest.api.network.test_networks
                 tempest.api.network.test_extensions
-                tempest.scenario.test_network_basic_ops
-                tempest.scenario.test_network_advanced_server_ops
+                #tempest.scenario.test_network_basic_ops
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
+                #tempest.scenario.test_network_advanced_server_ops
+                tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_pause_unpause
+                tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_reboot
+                tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_rebuild
+                tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_resize
                 )
             pushd /opt/stack/tempest
             testr init
@@ -1603,6 +1617,7 @@
           git fetch
           git checkout $ZUUL_BRANCH
           git pull
+          #git checkout 2381f336296c80834ca9ce5ed3f1c784acc4d157
 
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
@@ -1616,12 +1631,13 @@
             #!/bin/bash
             #Prepare  environment
             phase="ADD-MAC-NOVA"
-            echo "STARTED: ############## $phase  ###################"
-            WORKSPACE=${WORKSPACE:-$(dirname `readlink -f -- $0`)}
-            echo "WORKSPACE=$WORKSPACE"
             if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
                 exit 0
             fi
+
+            echo "STARTED: ############## $phase  ###################"
+            WORKSPACE=${WORKSPACE:-$(dirname `readlink -f -- $0`)}
+            echo "WORKSPACE=$WORKSPACE"
 
             source $WORKSPACE/devstack/openrc admin
 
@@ -1652,10 +1668,10 @@
         - shell: |
             #!/bin/bash
             phase="DELETE_MAC_NOVA"
-            echo "STARTED: ############## $phase  ###################"
             if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
                 exit 0
             fi
+            echo "STARTED: ############## $phase  ###################"
             ADD_MAC='/tmp/add_mac.sh'
             HCA=${HCA:-"mlx4"}
             echo "NOVA CI clean macs"
