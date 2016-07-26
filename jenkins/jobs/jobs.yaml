@@ -1,7 +1,6 @@
 - job-template:
     name: 'Nova-ML2-Sriov'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -566,4 +565,44 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
- 
+
+- job:
+    name: Mellanox-CI-Daily-Upstream-Status
+    project-type: multijob
+    node:  master
+    triggers:
+      - timed: '@daily'
+    builders:
+       - multijob:
+           name: Nova
+           condition: ALWAYS
+           projects:
+              - name: Nova-ML2-Sriov
+                current-parameters: true
+              - name: Nova-MACVTAP-ML2-Sriov
+                current-parameters: true
+              - name: Tempest-Sriov
+                current-parameters: true
+       - multijob:
+           name: Neutron
+           condition: ALWAYS
+           projects:
+              - name: Neutron-ML2-Sriov
+                current-parameters: true
+              - name: Neutron-ML2-MLNX
+                current-parameters: true
+              - name: Neutron-Networking-MLNX-ML2
+                current-parameters: true
+       - multijob:
+           name: Cinder-ISER
+           condition: ALWAYS
+           projects:
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
