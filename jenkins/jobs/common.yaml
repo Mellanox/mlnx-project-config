@@ -1120,6 +1120,7 @@
           echo "STARTED: ############## $phase  ###################"
           if [ -d $WORKSPACE/mlnx-project-config ];then
               pushd $WORKSPACE/mlnx-project-config
+              git checkout .
               git pull
               popd
           else
@@ -1617,7 +1618,6 @@
           git fetch
           git checkout $ZUUL_BRANCH
           git pull
-          #git checkout 2381f336296c80834ca9ce5ed3f1c784acc4d157
 
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
