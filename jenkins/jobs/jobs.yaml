@@ -27,7 +27,12 @@
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -44,7 +49,6 @@
 - job-template:
     name: 'Nova-MACVTAP-ML2-Sriov'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -70,7 +74,12 @@
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -84,12 +93,9 @@
       - upload-console-log #This line must be the last one
 
 
-
-
 - job-template:
     name: 'Tempest-Sriov'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -115,7 +121,12 @@
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -128,10 +139,10 @@
           publish-failed-builds: true
       - upload-console-log #This line must be the last one
 
+
 - job-template:
     name: 'Neutron-ML2-MLNX'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -151,7 +162,12 @@
       - apply-workarounds-post-stack
       - 'run-tests-{name}'
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -168,7 +184,6 @@
 - job-template:
     name: 'Neutron-ML2-Sriov'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -195,7 +210,12 @@
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -208,10 +228,10 @@
           publish-failed-builds: true
       - upload-console-log  #This line must be the last one
 
+
 - job-template:
     name: 'Neutron-Networking-MLNX-ML2'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -231,7 +251,12 @@
       - apply-workarounds-post-stack
       - 'run-tests-{name}'
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -248,7 +273,6 @@
 - job-template:
     name: 'Ironic-IB'
     node: '{node}'
-
     builders:
       - inject:
           properties-content: |
@@ -271,7 +295,12 @@
       #- 'run-tests-{name}-configure-Real-BM'
       #- 'run-tests-{name}-run-Real-BM'
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -302,7 +331,12 @@
       - clean-environment
       - noop-run
       - produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -337,6 +371,12 @@
       - run-stacksh # Running Devstack
       - run-tests-cinder
       - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
@@ -374,6 +414,12 @@
       - run-stacksh # Running Devstack
       - run-tests-cinder
       - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
@@ -388,6 +434,7 @@
       - timeout:
           timeout: 320
           fail: true
+
 
 - job-template:
     name: 'Debian-networking-mlnx-build'
@@ -408,8 +455,12 @@
             IMAGE_SERVER=13.69.151.247
             PATH=$PATH:/usr/sbin
       - mlnx-debian-build
-      #- produce-readme-file
-
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -421,151 +472,6 @@
           publish-unstable-builds: true
           publish-failed-builds: true
 
-######################################################
-###               MULTI NODE CI     ##################
-######################################################
-
-- job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Controller'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
-            PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh
-      - apply-workarounds-post-stack
-      - apply-workarounds-tempest
-        #- noop-run
-    publishers:
-      - build-publisher:
-          name: MellanoxAzureServer
-          publish-unstable-builds: true
-          publish-failed-builds: true
-      - upload-console-log-mn #This line must be the last one
-
-
-- job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Compute'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
-            PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh
-      - apply-workarounds-post-stack
-        #- noop-run
-    publishers:
-      - build-publisher:
-          name: MellanoxAzureServer
-          publish-unstable-builds: true
-          publish-failed-builds: true
-      - upload-console-log-mn #This line must be the last one
-
-- job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Tempest'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
-            PATH=$PATH:/usr/sbin
-      - mlnx-project-config
-      - run-tests-multinode
-      - stop-stacksh
-        #- noop-run
-
-    publishers:
-      - build-publisher:
-          name: MellanoxAzureServer
-          publish-unstable-builds: true
-          publish-failed-builds: true
-      - upload-console-log-mn #This line must be the last one
-
-
-- job-template:
-    name: 'Nova-ML2-Sriov-Multinode-StopCompute'
-    node: '{node}'
-    parameters:
-    builders:
-       - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
-            PATH=$PATH:/usr/sbin
-       - stop-stacksh
-         #- noop-run
-
-    publishers:
-      - build-publisher:
-          name: MellanoxAzureServer
-          publish-unstable-builds: true
-          publish-failed-builds: true
-      - upload-console-log-mn #This line must be the last one
-
-- job:
-    name: Nova-ML2-Sriov-Multinode
-    project-type: multijob
-    node: master
-    builders:
-       - multijob:
-           name: Controller
-           condition: SUCCESSFUL
-           projects:
-              - name: Nova-ML2-Sriov-Multinode-Controller
-                current-parameters: true
-       - multijob:
-           name: Compute
-           condition: SUCCESSFUL
-           projects:
-              - name: Nova-ML2-Sriov-Multinode-Compute
-                current-parameters: true
-                predefined-parameters: CONTROLLER_NODE=cloudx-22
-       - multijob:
-           name: Tempest
-           condition: SUCCESSFUL
-           projects:
-              - name: Nova-ML2-Sriov-Multinode-Tempest
-                current-parameters: true
-       - multijob:
-           name: StopCompute
-           condition: ALWAYS
-           projects:
-              - name: Nova-ML2-Sriov-Multinode-StopCompute
-                current-parameters: true
-    publishers:
-      - build-publisher:
-          name: MellanoxAzureServer
-          publish-unstable-builds: true
-          publish-failed-builds: true
 
 - job:
     name: Mellanox-CI-Daily-Upstream-Status
@@ -602,6 +508,185 @@
                 current-parameters: true
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+
+
+######################################################
+###               MULTI NODE CI     ##################
+######################################################
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Controller'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack
+      - apply-workarounds-tempest
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Compute'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-Tempest'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - mlnx-project-config
+      - run-tests-multinode
+      - stop-stacksh
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job-template:
+    name: 'Nova-ML2-Sriov-Multinode-StopCompute'
+    node: '{node}'
+    parameters:
+    builders:
+       - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx4
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+       - stop-stacksh
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log-mn #This line must be the last one
+
+
+- job:
+    name: Nova-ML2-Sriov-Multinode
+    project-type: multijob
+    node: master
+    builders:
+       - multijob:
+           name: Controller
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Controller
+                current-parameters: true
+       - multijob:
+           name: Compute
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Compute
+                current-parameters: true
+                predefined-parameters: CONTROLLER_NODE=cloudx-22
+       - multijob:
+           name: Tempest
+           condition: SUCCESSFUL
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-Tempest
+                current-parameters: true
+       - multijob:
+           name: StopCompute
+           condition: ALWAYS
+           projects:
+              - name: Nova-ML2-Sriov-Multinode-StopCompute
+                current-parameters: true
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
