@@ -391,6 +391,7 @@
 
 - job-template:
     name: 'Debian-networking-mlnx-build'
+    node: master
     triggers:
       - timed: '@daily'
       - pollurl:
@@ -533,7 +534,7 @@
 - job:
     name: Nova-ML2-Sriov-Multinode
     project-type: multijob
-    node:  master
+    node: master
     builders:
        - multijob:
            name: Controller
