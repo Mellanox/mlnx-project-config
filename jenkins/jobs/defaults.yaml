@@ -13,7 +13,7 @@
       - timestamps
 
     build-discarder:
-      daysToKeep: 90
+      daysToKeep: 100
       numToKeep: 1000
       artifactDaysToKeep: 100
-      artifactNumToKeep: 100
+      artifactNumToKeep: 1000

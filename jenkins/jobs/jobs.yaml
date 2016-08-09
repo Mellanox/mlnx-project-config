@@ -29,10 +29,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -76,10 +76,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -123,10 +123,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -164,10 +164,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -212,10 +212,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -253,10 +253,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -297,10 +297,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -333,10 +333,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -373,10 +373,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
@@ -416,10 +416,10 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
@@ -457,10 +457,10 @@
       - mlnx-debian-build
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -490,30 +490,62 @@
                 current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
-       - multijob:
-           name: Neutron
-           condition: ALWAYS
-           projects:
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
                 current-parameters: true
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
-       - multijob:
-           name: Cinder-ISER
-           condition: ALWAYS
-           projects:
               - name: Cinder-ISER-LIO
                 current-parameters: true
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+
+
+- job:
+    name: Test-SRIOV-ETH-Node
+    project-type: multijob
+    node:  master
+    builders:
+       - multijob:
+           name: Nova
+           condition: ALWAYS
+           projects:
+              - name: Test_Nova_SRIOV
+                current-parameters: true
+              - name: Test_Nova_MACVTAP
+                current-parameters: true
+       - multijob:
+           name: Neutron
+           condition: ALWAYS
+           projects:
+              - name: Test_Neutron_SRIOV
+                current-parameters: true
+       - multijob:
+           name: Cinder-ISER
+           condition: ALWAYS
+           projects:
+              - name: Test_Cinder_ISER_LIO
+                current-parameters: true
+              - name: Test_Cinder_ISER_ISCSI
+                current-parameters: true
+    properties:
+      - build-discarder:
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -548,10 +580,10 @@
       - apply-workarounds-tempest
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -582,10 +614,10 @@
       - apply-workarounds-post-stack
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -611,10 +643,10 @@
       - stop-stacksh
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -639,10 +671,10 @@
        - stop-stacksh
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -683,10 +715,10 @@
                 current-parameters: true
     properties:
       - build-discarder:
-          days-to-keep: 60
-          num-to-keep: 100
-          artifact-days-to-keep: 60
-          artifact-num-to-keep: 100
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 1000
     publishers:
       - build-publisher:
           name: MellanoxAzureServer

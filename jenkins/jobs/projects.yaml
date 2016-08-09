@@ -33,7 +33,7 @@
 - project:
     name: Nova-MACVTAP-ML2-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH_MACVTAP
+    node: ETH_CX34
 
     jobs:
         - 'Nova-MACVTAP-ML2-Sriov'

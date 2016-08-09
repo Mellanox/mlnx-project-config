@@ -45,7 +45,7 @@
             sudo ovs-vsctl show > $CI_ARTIFACTS/env/ovs-vsctl.txt
             sudo lspci|grep Mellanox > $CI_ARTIFACTS/env/lspci.txt
             sudo uname -a > $CI_ARTIFACTS/env/uname.txt
-
+            sudo cp /var/log/messages $CI_ARTIFACTS/env/
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -58,6 +58,8 @@
             [ -f /opt/stack/tempest/etc/tempest.conf ] && cp -L /opt/stack/tempest/etc/tempest.conf $CI_ARTIFACTS
             [ -f $WORKSPACE/devstack/local.conf ] && cp $WORKSPACE/devstack/local.conf $CI_ARTIFACTS
             [ -f /var/log/eswitchd/eswitchd.log ] && cp /var/log/eswitchd/eswitchd.log $LOGDIR
+            sudo cp /var/log/libvirt/libvirtd.log $LOGDIR
+            sudo cp -r /var/log/libvirt/qemu $LOGDIR
 
             exit 0
 
@@ -84,16 +86,19 @@
 
             sudo dpkg --configure -a
             sudo dmesg -c > /dev/null
+            sudo sh -c "> /var/log/messages"
 
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
-            if [ -d $WORKSPACE/devstack ]; then
-                echo "Cleaning up possible remainings of previous builds."
-                $WORKSPACE/devstack/clean.sh 2>&1|tee > /dev/null
+            if [ ! -d $WORKSPACE/devstack ]; then
+                git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
             fi
+            echo "Cleaning up possible remainings of previous builds."
+            $WORKSPACE/devstack/clean.sh 2>&1|tee > /dev/null
 
             # Remove stack screens leftovers
             sudo screen -wipe
+            screen -wipe
 
             # Check Cinder leftovers
             if [ $(echo $JOB_NAME|grep Cinder) ]; then
@@ -273,7 +278,7 @@
           phase="CONFIGURE-DEVSTACK-Neutron-ML2-MLNX"
           echo "STARTED: ############## $phase  ###################"
           if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
-              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|rev|cut -d':' -f1|rev`
           else
               export NETWORKING_MLNX_BRANCH=$ZUUL_BRANCH
           fi
@@ -446,6 +451,8 @@
           shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
+          #TOFIX anf REMOVE
+          suspend = False
           [network]
           port_vnic_type=direct
           EOF
@@ -579,7 +586,7 @@
           phase="CONFIGURE-DEVSTACK-Neutron-Networking-MLNX-ML2"
           echo "STARTED: ############## $phase  ###################"
           if [ "$ZUUL_PROJECT" == "openstack/networking-mlnx" ]; then
-              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|cut -d':' -f3`
+              export NETWORKING_MLNX_BRANCH=`echo $ZUUL_CHANGES|rev|cut -d':' -f1|rev`
           else
               export NETWORKING_MLNX_BRANCH=$ZUUL_BRANCH
           fi
@@ -760,6 +767,8 @@
           shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
+          #TOFIX and remove
+          suspend = False
           [network]
           port_vnic_type=macvtap
           EOF
@@ -847,6 +856,8 @@
           shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
+          #TO FIX and REMOVE
+          suspend = False
           [network]
           port_vnic_type=direct
           EOF
@@ -934,7 +945,7 @@
           shared_physical_device_mappings=default:${mlnx_port}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          #suspend=False
+          suspend=False
           [network]
           port_vnic_type=direct
           EOF
@@ -1137,7 +1148,7 @@
           echo "STARTED: ############## $phase  ###################"v
           if [[ -n $ZUUL_PROJECT ]]; then
               project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
-              refspec=$(echo ${ZUUL_CHANGES##*^} | cut -d':' -f3)
+              refspec=$(echo ${ZUUL_CHANGES##*^} | rev|cut -d':' -f1|rev)
               project=${project//-/_}
               export ${project^^}_BRANCH=$refspec
           fi
@@ -1293,7 +1304,7 @@
                 #tempest.scenario.test_network_basic_ops
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
+                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
                 #tempest.scenario.test_network_advanced_server_ops
                 tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_pause_unpause
@@ -1540,7 +1551,11 @@
               rm -f $tmp_subunit
               popd
           fi
+          sudo chown -R stack $CI_ARTIFACTS
 
+          echo "LNY $CI_ARTIFACTS"
+          ls $CI_ARTIFACTS/logs
+          #grep -m1 -B 10 'as fail' $CI_ARTIFACTS/logs/stack.sh.log > $CI_ARTIFACTS/env/failure_analysis.txt
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
           rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
@@ -1570,7 +1585,10 @@
 
           ip=$(echo $LOGSERVER | cut -d'@' -f2)
           echo "Detailed logs: http://$ip/$UPLOAD_LOGPATH"
-          echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/testr_results.html.gz"
+
+          if [ -f $CI_ARTIFACTS/testr_results.html.gz ]; then
+              echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/testr_results.html.gz"
+          fi
 
           if [ ! -z "$LOG_PATH" ]; then
               REVIEW_PATH=`echo $UPLOAD_LOGPATH|cut -d'/' -f2`
@@ -1608,7 +1626,6 @@
           echo "STARTED: ############## $phase  ###################"
 
           devstack_repo=git://git.openstack.org/openstack-dev/devstack
-          retries=10
           if [[ ! -d $WORKSPACE/devstack ]];then
               git clone $devstack_repo
           fi
