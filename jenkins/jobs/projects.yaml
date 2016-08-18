@@ -2,31 +2,28 @@
     name: Neutron-ML2-MLNX
     github-org: openstack-dev
     node: SRIOV_IB
-
     jobs:
       - 'Neutron-ML2-MLNX'
 
 - project:
     name: Neutron-ML2-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH
+    node: SRIOV_ETH || ETH_CX34
 
     jobs:
-      - 'Neutron-ML2-Sriov'
+      - Neutron-ML2-Sriov
 
 - project:
     name: Neutron-Networking-MLNX-ML2
     github-org: openstack-dev
     node: SRIOV_IB
-
     jobs:
         - Neutron-Networking-MLNX-ML2
 
 - project:
     name: Nova-ML2-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH
-
+    node: SRIOV_ETH || ETH_CX34
     jobs:
         - 'Nova-ML2-Sriov'
 
@@ -34,7 +31,6 @@
     name: Nova-MACVTAP-ML2-Sriov
     github-org: openstack-dev
     node: ETH_CX34
-
     jobs:
         - 'Nova-MACVTAP-ML2-Sriov'
 
@@ -42,23 +38,20 @@
     name: Ironic-IB
     github-org: openstack-dev
     node: IRONIC_IB
-
     jobs:
         - 'Ironic-IB'
 
 - project:
     name: NOOP
     github-org: openstack-dev
-    node: SRIOV_ETH
-
+    node: SRIOV_ETH || ETH_CX34
     jobs:
         - 'NOOP'
 
 - project:
     name: Tempest-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH
-
+    node: SRIOV_ETH || ETH_CX34
     jobs:
         - 'Tempest-Sriov'
 
@@ -66,7 +59,6 @@
     name: Cinder-ISER-ISCSI
     github-org: openstack-dev
     node: CINDER
-
     jobs:
         - 'Cinder-ISER-ISCSI'
 
@@ -74,13 +66,11 @@
     name: Cinder-ISER-LIO
     github-org: openstack-dev
     node: CINDER
-
     jobs:
         - 'Cinder-ISER-LIO'
 
 - project:
     name: Debian-networking-mlnx-build
-
     jobs:
         - 'Debian-networking-mlnx-build'
 

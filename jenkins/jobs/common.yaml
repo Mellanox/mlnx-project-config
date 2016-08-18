@@ -36,8 +36,8 @@
             mkdir -p $CI_ARTIFACTS/etc
             mkdir -p $CI_ARTIFACTS/env
 
-            pip --version
-            pip freeze 2>&1 | tee > $CI_ARTIFACTS/env/pip-freeze.txt
+            pip freeze > $CI_ARTIFACTS/env/pip-freeze-env.txt
+            [ -d /opt/stack/tempest/virt ] && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             dpkg --list > $CI_ARTIFACTS/env/dpkg.txt
             sudo lvs > $CI_ARTIFACTS/env/lvs.txt
             env > $CI_ARTIFACTS/env/environment.txt
@@ -46,6 +46,7 @@
             sudo lspci|grep Mellanox > $CI_ARTIFACTS/env/lspci.txt
             sudo uname -a > $CI_ARTIFACTS/env/uname.txt
             sudo cp /var/log/messages $CI_ARTIFACTS/env/
+            sudo cp /var/log/syslog $CI_ARTIFACTS/env/
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -58,6 +59,7 @@
             [ -f /opt/stack/tempest/etc/tempest.conf ] && cp -L /opt/stack/tempest/etc/tempest.conf $CI_ARTIFACTS
             [ -f $WORKSPACE/devstack/local.conf ] && cp $WORKSPACE/devstack/local.conf $CI_ARTIFACTS
             [ -f /var/log/eswitchd/eswitchd.log ] && cp /var/log/eswitchd/eswitchd.log $LOGDIR
+
             sudo cp /var/log/libvirt/libvirtd.log $LOGDIR
             sudo cp -r /var/log/libvirt/qemu $LOGDIR
 
@@ -128,11 +130,15 @@
               sudo pip uninstall -r $file -y 2>&1|tee > /dev/null
             done
 
-            sudo pip install setuptools==20.1.1
+            #sudo pip install setuptools==20.1.1
             sudo pip install pbr
-            sudo pip install eventlet
+            #sudo pip install eventlet
             sudo pip install six
             sudo pip install jinja2
+            #sudo pip install urllib3 --upgrade
+
+            #workaround for stable/mitaka
+            sudo pip install oslo.privsep
 
             sudo yum install python-requests rabbitmq-server -y
 
@@ -177,7 +183,7 @@
 
             for folder in `find /opt/stack -type d -maxdepth 1`; do
                 pushd $folder
-                echo "folder $PWD"
+                echo "Cleaning $PWD"
                 git checkout master
                 git checkout .
                 git pull
@@ -225,7 +231,6 @@
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
 
-            sudo pip install urllib3 --upgrade
 
 - builder:
     name: apply-workarounds-tempest
@@ -235,7 +240,7 @@
             phase="APPLY-WORKAROUNDS-POST-TEMPEST"
             echo "STARTED: ############## $phase  ###################"
             cd /opt/stack/tempest
-            git fetch https://git.openstack.org/openstack/tempest refs/changes/47/335447/11 && git cherry-pick FETCH_HEAD
+            #git fetch https://git.openstack.org/openstack/tempest refs/changes/47/335447/11 && git cherry-pick FETCH_HEAD
             git fetch https://git.openstack.org/openstack/tempest refs/changes/30/339230/2 && git cherry-pick FETCH_HEAD
 
 
@@ -317,8 +322,8 @@
           epioib_port=$epioib_port
           NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -382,15 +387,18 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-              export EXTENSION=fdb
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
           fi
-          cat >  $WORKSPACE/devstack/local.conf <<EOF
+
+          cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
           IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
@@ -403,10 +411,9 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
-          EXTENSION=${EXTENSION:-fdb}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -446,9 +453,7 @@
           [ml2_sriov]
           agent_required=True
           [agent]
-          extensions=$EXTENSION
-          [FDB]
-          shared_physical_device_mappings=default:${mlnx_port}
+          $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           #TOFIX anf REMOVE
@@ -482,8 +487,8 @@
           RECLONE=yes
           USE_SCREEN=True
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
 
           #mlnx_port=\`ibdev2netdev |grep Up |awk '{print $5}'|tail -n1\`
@@ -627,8 +632,8 @@
           PUBLIC_INTERFACE=$epioib_port
           NETWORKING_MLNX_BRANCH=${NETWORKING_MLNX_BRANCH:-\$ZUUL_BRANCH}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -697,14 +702,17 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | awk '{print $5}'`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-              export EXTENSION=fdb
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
           fi
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -718,10 +726,9 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
-          EXTENSION=${EXTENSION:-fdb}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -762,9 +769,7 @@
           [ml2_sriov]
           supported_pci_vendor_devs=15b3:1014
           [agent]
-          extensions=$EXTENSION
-          [FDB]
-          shared_physical_device_mappings=default:${mlnx_port}
+          $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           #TOFIX and remove
@@ -786,14 +791,17 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-              export EXTENSION=fdb
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
           fi
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -807,10 +815,9 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
-          EXTENSION=${EXTENSION:-fdb}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -851,9 +858,7 @@
           [ml2_sriov]
           agent_required=True
           [agent]
-          extensions=$EXTENSION
-          [FDB]
-          shared_physical_device_mappings=default:${mlnx_port}
+          $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           #TO FIX and REMOVE
@@ -875,14 +880,17 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-              export EXTENSION=fdb
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
           fi
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -896,10 +904,9 @@
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
-          EXTENSION=${EXTENSION:-fdb}
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -940,9 +947,7 @@
           [ml2_sriov]
           agent_required=True
           [agent]
-          extensions=$EXTENSION
-          [FDB]
-          shared_physical_device_mappings=default:${mlnx_port}
+          $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           suspend=False
@@ -967,6 +972,12 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
+          fi
+
           env
           export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-22"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -982,8 +993,8 @@
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -1029,6 +1040,8 @@
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
+          [agent]
+          $EXTENSION
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1049,6 +1062,12 @@
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
           fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
+          fi
+
           env
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1067,8 +1086,8 @@
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
           # Logging
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
           # Cinder
@@ -1105,11 +1124,9 @@
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
-          supported_pci_vendor_devs = 15b3:1004, 15b3:1014
           [agent]
-          extensions=fdb
-          [FDB]
-          shared_physical_device_mappings=default:${mlnx_port}
+          $EXTENSION
+          supported_pci_vendor_devs = 15b3:1004, 15b3:1014
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           suspend=False
@@ -1193,6 +1210,11 @@
             tests=ironic_tempest_plugin.tests.api
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1245,7 +1267,7 @@
                 tempest.api.network.test_networks
                 tempest.api.network.test_extensions
                 #tempest.scenario.test_network_basic_ops
-                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
                 #LNY TOFIX test_router_rescheduling works on old Ubuntu CI
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
@@ -1256,6 +1278,11 @@
             cd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1281,6 +1308,11 @@
             cd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1315,6 +1347,11 @@
             pushd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1337,7 +1374,7 @@
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_hotplug_nic
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_port_security_macspoofing_port
-                #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_subnet_details
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_instance_port_admin_state
@@ -1346,6 +1383,11 @@
             pushd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1365,6 +1407,11 @@
             neutron net-list
             cd /opt/stack/tempest
             testr init
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run tempest.scenario.test_network_basic_ops.TestNetworkBasicOps
             cd -
 
@@ -1377,11 +1424,20 @@
             phase="RUN-TESTS-NETWORK-ADVANCED"
             echo "STARTED: ############## $phase  ###################"
             tests=(
-                tempest.scenario.test_network_advanced_server_ops
+                #tempest.scenario.test_network_advanced_server_ops
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_pause_unpause
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_reboot
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_resize
+                tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_stop_start
             )
             pushd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1407,6 +1463,11 @@
             pushd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1519,6 +1580,11 @@
             pushd /opt/stack/tempest
             testr init
             testr list-tests ${tests[@]}
+
+            virtualenv virt --system-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+
             testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1553,9 +1619,8 @@
           fi
           sudo chown -R stack $CI_ARTIFACTS
 
-          echo "LNY $CI_ARTIFACTS"
           ls $CI_ARTIFACTS/logs
-          #grep -m1 -B 10 'as fail' $CI_ARTIFACTS/logs/stack.sh.log > $CI_ARTIFACTS/env/failure_analysis.txt
+          grep -m1 -B 10 'as fail' $CI_ARTIFACTS/logs/stack.sh.log 2>&1 | tee > $CI_ARTIFACTS/logs/failure_analysis.txt
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
           rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
@@ -1626,9 +1691,10 @@
           echo "STARTED: ############## $phase  ###################"
 
           devstack_repo=git://git.openstack.org/openstack-dev/devstack
-          if [[ ! -d $WORKSPACE/devstack ]];then
-              git clone $devstack_repo
-          fi
+          [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
+          #if [[ ! -d $WORKSPACE/devstack ]];then
+          git clone $devstack_repo
+          #fi
           pushd $WORKSPACE/devstack
 
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
@@ -1732,8 +1798,8 @@
           LIBS_FROM_GIT=os-brick
           RECLONE=yes
 
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           SCREEN_LOGDIR=$LOGDIR/screen
           LOGDAYS=2
 
@@ -1810,8 +1876,8 @@
           LIBS_FROM_GIT=os-brick
           RECLONE=yes
 
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          LOGFILE=$LOGDIR/stack.sh.log
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
           SCREEN_LOGDIR=$LOGDIR/screen
           LOGDAYS=2
 
@@ -1894,6 +1960,11 @@
                 cd /opt/stack/tempest
                 testr init
                 testr list-tests ${tests[@]}
+
+                virtualenv virt --system-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+
                 testr run ${tests[@]}
                 test_pass=$?
 
