@@ -45,9 +45,10 @@ def send_email(rm):
 def main(log_dir='.'):
     for rm, details in known_issues.iteritems():
         try:
-            print ("Checking %s for %s" % ( details['file'], details['pattern']))
-            if details['pattern'] in open(details['file']).read():
-                print "RM#%s happened again in %s" % ( rm, log_dir )
+            log = "%s/%s" % ( log_dir, details['file'])
+            print ("Checking %s for %s" % (log, details['pattern']))
+            if details['pattern'] in open(log).read():
+                print "RM#%s happened again in %s" % (rm, log_dir)
                 send_email(rm)
         except Exception as e:
             print "Exception %s" % ( e )
@@ -55,7 +56,7 @@ def main(log_dir='.'):
 
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+   main(sys.argv[1:][0])
 
 
 
