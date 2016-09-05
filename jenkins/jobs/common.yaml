@@ -36,6 +36,7 @@
             mkdir -p $CI_ARTIFACTS/etc
             mkdir -p $CI_ARTIFACTS/env
 
+            pip --version
             pip freeze > $CI_ARTIFACTS/env/pip-freeze-env.txt
             [ -d /opt/stack/tempest/virt ] && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             dpkg --list > $CI_ARTIFACTS/env/dpkg.txt
@@ -47,6 +48,7 @@
             sudo uname -a > $CI_ARTIFACTS/env/uname.txt
             sudo cp /var/log/messages $CI_ARTIFACTS/env/
             sudo cp /var/log/syslog $CI_ARTIFACTS/env/
+            sudo ps -ef > $CI_ARTIFACTS/env/procs.log
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -111,6 +113,12 @@
                 sudo service tgt restart > /dev/null 2>&1 || true
             fi
 
+            # https://redmine.mtl.com/issues/855578
+            sudo cat /etc/issue | grep -i ubuntu
+            if [ $? -eq 0 ]; then
+                sudo apt-get purge -y libvirt*
+                sudo rm -rf /var/lib/libvirt/
+            fi
 
             sudo kill $(pgrep rabbitmq)
             sudo kill $(pgrep beam.smp)
@@ -137,7 +145,6 @@
             sudo pip install jinja2
             #sudo pip install urllib3 --upgrade
 
-            #workaround for stable/mitaka
             sudo pip install oslo.privsep
 
             sudo yum install python-requests rabbitmq-server -y
@@ -211,7 +218,7 @@
     name: apply-workarounds-post-stack
     builders:
         - shell: |
-            #!/bin/bash -x
+            #!/bin/bash -xE
             phase="APPLY-WORKAROUNDS-POST"
             echo "STARTED: ############## $phase  ###################"
 
@@ -231,6 +238,9 @@
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
 
+            # https://review.openstack.org/#/c/365333
+            #sudo sed -i -r 's/^cgroup_device_acl = \[$/cgroup_device_acl = \[\"\/dev\/vfio\/vfio\",/g' /etc/libvirt/qemu.conf
+            #sudo systemctl restart libvirt-bin 2>&1|tee
 
 - builder:
     name: apply-workarounds-tempest
@@ -239,9 +249,9 @@
             #!/bin/bash -x
             phase="APPLY-WORKAROUNDS-POST-TEMPEST"
             echo "STARTED: ############## $phase  ###################"
-            cd /opt/stack/tempest
-            #git fetch https://git.openstack.org/openstack/tempest refs/changes/47/335447/11 && git cherry-pick FETCH_HEAD
-            git fetch https://git.openstack.org/openstack/tempest refs/changes/30/339230/2 && git cherry-pick FETCH_HEAD
+            # Migration patch
+            #cd /opt/stack/tempest
+            #git fetch https://git.openstack.org/openstack/tempest refs/changes/30/339230/4 && git cherry-pick FETCH_HEAD
 
 
 
@@ -267,7 +277,7 @@
           #!/bin/bash -ex
           env
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev | grep ${HCA}_0 | grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -300,7 +310,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| grep ib| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up| grep ib| awk '{print $5}'|tail -n1`
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
@@ -362,9 +372,12 @@
           [DEFAULT]
           pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ovs]
+          of_interface=ovs-ofctl
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          #suspend=false
+          suspend=false
           resize=false
           [network]
           port_vnic_type=direct
@@ -372,6 +385,9 @@
           port_admin_state_change=false
           [scenario]
           dhcp_client=
+          [compute]
+          flavor_ref=2
+          flavor_ref_alt=2
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -387,7 +403,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -456,10 +472,10 @@
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          #TOFIX anf REMOVE
-          suspend = False
           [network]
           port_vnic_type=direct
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -610,8 +626,8 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
-          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"|grep Up| awk '{print $5}'|tail -n1`
+          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" |grep Up| awk '{print $5}'|head -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -688,6 +704,9 @@
           port_admin_state_change=false
           [scenario]
           dhcp_client=
+          [compute]
+          flavor_ref=2
+          flavor_ref_alt=2
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -702,7 +721,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -772,8 +791,6 @@
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          #TOFIX and remove
-          suspend = False
           [network]
           port_vnic_type=macvtap
           EOF
@@ -791,7 +808,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -861,8 +878,6 @@
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          #TO FIX and REMOVE
-          suspend = False
           [network]
           port_vnic_type=direct
           EOF
@@ -880,7 +895,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -950,7 +965,6 @@
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          suspend=False
           [network]
           port_vnic_type=direct
           EOF
@@ -967,7 +981,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| grep "port 1" | awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -1057,7 +1071,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"|grep Up| awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -1129,7 +1143,6 @@
           supported_pci_vendor_devs = 15b3:1004, 15b3:1014
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
-          suspend=False
           migrate=True
           [compute]
           min_compute_nodes=2
@@ -1169,8 +1182,7 @@
               project=${project//-/_}
               export ${project^^}_BRANCH=$refspec
           fi
-          #For latest Ubuntu
-          #export FORCE=yes
+
           export ESWITCHD_BRANCH="master"
 
           BUILD_ID=dontKillMe $WORKSPACE/devstack/stack.sh
@@ -1208,14 +1220,8 @@
             echo "STARTED: ############## $phase  ###################"
             cd /opt/stack/tempest
             tests=ironic_tempest_plugin.tests.api
-            testr init
             testr list-tests ${tests[@]}
-
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1276,14 +1282,10 @@
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_reboot
             )
             cd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
 
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
+            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
 
-            testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1306,14 +1308,10 @@
                 tempest.api.network.test_extensions
             )
             cd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
 
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
+            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
 
-            testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1345,14 +1343,9 @@
                 tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_resize
                 )
             pushd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf -V -n --serial ${tests[@]}
 
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1381,14 +1374,10 @@
                 tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
             )
             pushd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf --serial tempest.scenario.test_network_basic_ops -V -n
+            #./run_tempest.sh -N -C etc/tempest.conf --serial ${tests[@]} -V -n
 
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1406,13 +1395,7 @@
             echo "STARTED: ############## $phase  ###################"
             neutron net-list
             cd /opt/stack/tempest
-            testr init
-
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run tempest.scenario.test_network_basic_ops.TestNetworkBasicOps
+            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
             cd -
 
 
@@ -1431,14 +1414,9 @@
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_stop_start
             )
             pushd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf --serial tempest.scenario.test_network_advanced_server_ops -V -n
 
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1461,14 +1439,8 @@
                   tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration
             )
             pushd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
-
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf -V -n --serial ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1578,14 +1550,8 @@
                 )
 
             pushd /opt/stack/tempest
-            testr init
             testr list-tests ${tests[@]}
-
-            virtualenv virt --system-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-
-            testr run ${tests[@]}
+            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1619,8 +1585,7 @@
           fi
           sudo chown -R stack $CI_ARTIFACTS
 
-          ls $CI_ARTIFACTS/logs
-          grep -m1 -B 10 'as fail' $CI_ARTIFACTS/logs/stack.sh.log 2>&1 | tee > $CI_ARTIFACTS/logs/failure_analysis.txt
+          $WORKSPACE/mlnx-project-config/tools/analize.py $CI_ARTIFACTS/logs 2>&1|tee
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
           rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
@@ -1714,7 +1679,7 @@
             #!/bin/bash
             #Prepare  environment
             phase="ADD-MAC-NOVA"
-            if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
+            if [[ "$ZUUL_BRANCH" == "master" || -z "$ZUUL_BRANCH" ]]; then
                 exit 0
             fi
 
@@ -1751,7 +1716,7 @@
         - shell: |
             #!/bin/bash
             phase="DELETE_MAC_NOVA"
-            if [[ "\$ZUUL_BRANCH" == "master" || -z "\$ZUUL_BRANCH" ]]; then
+            if [[ "$ZUUL_BRANCH" == "master" || -z "$ZUUL_BRANCH" ]]; then
                 exit 0
             fi
             echo "STARTED: ############## $phase  ###################"
@@ -1780,7 +1745,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -1856,7 +1821,7 @@
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
           export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               exit 1
@@ -1945,7 +1910,7 @@
                 HCA=${HCA:-"mlx4"}
                 mlx=`echo $HCA | sed s/mlx//g`
                 let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|tail -n1`
+                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
 
                 sudo ifconfig $mlnx_port 1.1.1.1/32 up
 
@@ -1958,14 +1923,8 @@
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest
-                testr init
                 testr list-tests ${tests[@]}
-
-                virtualenv virt --system-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
-
-                testr run ${tests[@]}
+                ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
                 test_pass=$?
 
                 #sudo ifconfig $mlnx_port down

@@ -476,7 +476,7 @@
 
 
 - job:
-    name: Mellanox-CI-Daily-StableLiberty-Status
+    name: Mellanox-CI-Daily-StableNewton-Status
     project-type: multijob
     node:  master
 #    triggers:
@@ -489,42 +489,42 @@
               - name: Nova-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Tempest-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Cinder-ISER-LIO
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/liberty
+                   ZUUL_BRANCH=stable/newton
                    FORCE=yes
     properties:
       - build-discarder:
@@ -537,7 +537,9 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
-
+    wrappers:
+      - timeout:
+          timeout: 500
 
 - job:
     name: Mellanox-CI-Daily-StableMitaka-Status
@@ -601,6 +603,10 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
+    wrappers:
+      - timeout:
+          timeout: 500
+
 
 - job:
     name: Mellanox-CI-Daily-Master-Status
@@ -624,11 +630,11 @@
               - name: Neutron-ML2-MLNX
                 current-parameters: true
               - name: Neutron-Networking-MLNX-ML2
-                current-parameters: true
-              - name: Cinder-ISER-LIO
-                current-parameters: true
-              - name: Cinder-ISER-ISCSI
-                current-parameters: true
+#                current-parameters: true
+#              - name: Cinder-ISER-LIO
+#                current-parameters: true
+#              - name: Cinder-ISER-ISCSI
+#                current-parameters: true
     properties:
       - build-discarder:
           days-to-keep: 100
@@ -640,7 +646,9 @@
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
-
+    wrappers:
+      - timeout:
+          timeout: 500
 
 - job:
     name: Test-SRIOV-ETH-Node
