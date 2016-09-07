@@ -630,11 +630,11 @@
               - name: Neutron-ML2-MLNX
                 current-parameters: true
               - name: Neutron-Networking-MLNX-ML2
-#                current-parameters: true
-#              - name: Cinder-ISER-LIO
-#                current-parameters: true
-#              - name: Cinder-ISER-ISCSI
-#                current-parameters: true
+                current-parameters: true
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
     properties:
       - build-discarder:
           days-to-keep: 100

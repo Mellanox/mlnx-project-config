@@ -56,6 +56,16 @@
                 [ -d /etc/$project ] && cp -r /etc/$project $CI_ARTIFACTS/etc/
             done
 
+            for d in $(find /opt/stack/ -maxdepth 1 -type d )
+            do
+                pushd $d > /dev/null
+                x=$(git rev-parse HEAD 2>/dev/null)
+                if [ $? -eq 0 ]; then
+                    echo "$d $x" >> $CI_ARTIFACTS/env/stack_commits.txt
+                fi
+                popd > /dev/null
+            done
+
             [ -d /opt/stack/tempest/.testrepository ] && cp -L -r /opt/stack/tempest/.testrepository $CI_ARTIFACTS/
             [ -f /opt/stack/tempest/tempest.log ] && cp -L /opt/stack/tempest/tempest.log $LOGDIR/
             [ -f /opt/stack/tempest/etc/tempest.conf ] && cp -L /opt/stack/tempest/etc/tempest.conf $CI_ARTIFACTS
@@ -1768,14 +1778,28 @@
           SCREEN_LOGDIR=$LOGDIR/screen
           LOGDAYS=2
 
-          #Q_PLUGIN=$NeutronPlugin
-          Q_USE_SECGROUP=True
-          PHYSICAL_NETWORK=default
-          PHYSICAL_INTERFACE=$mlnx_port
           disable_service n-net heat h-api h-api-cfn h-api-cw h-eng n-cauth q-lbaas
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           disable_service n-novnc n-xvnc horizon
           enable_service tempest
+
+          #Neutron Configuration
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
+          Q_USE_DEBUG_COMMAND=False
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          Q_USE_SECGROUP=True
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=$mlnx_port
 
           SWIFT_HASH=password
           SWIFT_REPLICAS=1
@@ -1846,14 +1870,28 @@
           SCREEN_LOGDIR=$LOGDIR/screen
           LOGDAYS=2
 
-          #Q_PLUGIN=$NeutronPlugin
-          Q_USE_SECGROUP=True
-          PHYSICAL_NETWORK=default
-          PHYSICAL_INTERFACE=$mlnx_port
           disable_service n-net heat h-api h-api-cfn h-api-cw h-eng q-lbaas n-cauth
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           disable_service n-novnc n-xvnc horizon
           enable_service tempest
+
+          #Neutron Configuration
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
+          Q_USE_DEBUG_COMMAND=False
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-${PHYSICAL_INTERFACE}
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          Q_USE_SECGROUP=True
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=$mlnx_port
 
           SWIFT_HASH=password
           SWIFT_REPLICAS=1
