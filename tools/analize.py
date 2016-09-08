@@ -22,6 +22,10 @@ known_issues = { '1': { 'file': 'stack.sh.log',
                  '4': { 'file': 'stack.sh.log',
                         'pattern': "git call failed",
                         'msg': "PLease rerun the job again"
+                      },
+                 'stack_failed': { 'file': 'stack.sh.log',
+                        'pattern': "exit",
+                        'msg': "stack.sh failed. please check"
                       }
                }
 
@@ -32,7 +36,7 @@ def send_email(rm):
     fp = tempfile.NamedTemporaryFile(delete=True)
     fp.write('RM %s is back again\n' % rm)
     fp.write("%s\n" % known_issues[rm]['msg'])
-    fp.write("1 %s\n" % os.environ)
+    #fp.write("1 %s\n" % os.environ)
     fp.write("cloudx-16-01:/home/CI/scripts/rerun_jobs.py -p %s -j %s\n" % (os.environ.get('JOB_NAME',""), os.environ.get('BUILD_NUMBER',"")))
     fp.seek(0)
     msg = MIMEText(fp.read())
@@ -49,6 +53,14 @@ def send_email(rm):
 
 
 def main(log_dir='.'):
+
+    # Check stack.sh status
+    rm = 'stack_failed'
+    log = "%s/%s" % ( log_dir, known_issues[rm]['file'])
+    last_line = commands.getoutput('tail -n1 %s ' % log)
+    if last_line.find(known_issues[rm]['pattern']) >= 0:
+        send_email(rm)
+
     for rm, details in known_issues.iteritems():
         try:
             log = "%s/%s" % ( log_dir, details['file'])
@@ -59,6 +71,9 @@ def main(log_dir='.'):
         except Exception as e:
             print "Exception %s" % ( e )
             pass
+
+
+
 
 
 if __name__ == "__main__":
