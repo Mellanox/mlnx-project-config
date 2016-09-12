@@ -43,7 +43,7 @@ def send_email(rm):
     #http://13.69.151.247/05/357105/5/check-nova/Nova-ML2-Sriov/46b5418/env/environment.txt.gz
     fp.write('More details in http://%s/%s\n' % (os.environ.get('EXT_SERVER','') ,os.environ.get('LOG_PATH','')))
     fp.write("%s\n" % known_issues[rm]['msg'])
-    fp.write("\n\n\n %s\n" % os.environ)
+    #fp.write("\n\n\n %s\n" % os.environ)
     fp.write("cloudx-16-01:/home/CI/scripts/rerun_jobs.py -p %s -j %s\n" % (os.environ.get('JOB_NAME',""), os.environ.get('BUILD_NUMBER',"")))
     fp.seek(0)
     msg = MIMEText(fp.read())
@@ -63,7 +63,7 @@ def main(log_dir='.'):
 
     # Check stack.sh status
     rm = 'stack_failed'
-    log = "%s/%s" % ( log_dir, known_issues[rm]['file'])
+    log = "%s/%s/logs/stack.sh.log.gz" % ( log_dir, known_issues[rm]['file'])
     last_line = commands.getoutput('tail -n1 %s ' % log)
     if last_line.find(known_issues[rm]['pattern']) >= 0:
         send_email(rm)
