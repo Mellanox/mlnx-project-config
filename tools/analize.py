@@ -67,6 +67,8 @@ def main(log_dir='.'):
     last_line = commands.getoutput('tail -n1 %s ' % log)
     if last_line.find(known_issues[rm]['pattern']) >= 0:
         send_email(rm)
+    del known_issues[rm]
+
 
     for rm, details in known_issues.iteritems():
         try:
