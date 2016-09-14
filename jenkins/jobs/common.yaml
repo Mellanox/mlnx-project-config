@@ -464,7 +464,7 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-novnc n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
