@@ -8,7 +8,7 @@
 - project:
     name: Neutron-ML2-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH || ETH_CX34
+    node: ETH_CX34
 
     jobs:
       - Neutron-ML2-Sriov
@@ -23,7 +23,7 @@
 - project:
     name: Nova-ML2-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH || ETH_CX34
+    node: ETH_CX34
     jobs:
         - 'Nova-ML2-Sriov'
 
@@ -44,14 +44,14 @@
 - project:
     name: NOOP
     github-org: openstack-dev
-    node: SRIOV_ETH || ETH_CX34
+    node: ETH_CX34
     jobs:
         - 'NOOP'
 
 - project:
     name: Tempest-Sriov
     github-org: openstack-dev
-    node: SRIOV_ETH || ETH_CX34
+    node: ETH_CX34
     jobs:
         - 'Tempest-Sriov'
 

@@ -1149,8 +1149,8 @@
           [ml2_sriov]
           agent_required=True
           [agent]
-          $EXTENSION
           supported_pci_vendor_devs = 15b3:1004, 15b3:1014
+          $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           migrate=True
