@@ -154,7 +154,7 @@
             sudo pip install six
             sudo pip install jinja2
             #sudo pip install urllib3 --upgrade
-
+            sudo pip install docutils -y
             sudo pip install oslo.privsep
 
             sudo yum install python-requests rabbitmq-server -y
