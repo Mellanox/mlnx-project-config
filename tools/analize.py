@@ -7,19 +7,19 @@ from email.mime.text import MIMEText
 import sys
 import os
 
-known_issues = { '1': { 'file': 'stack.sh.log',
+known_issues = { 'loop_device': { 'file': 'stack.sh.log',
                         'pattern': "Unable to add physical volume '/dev/loop0' to volume group 'stack-volumes-lvmdriver-1'",
                         'msg': "PLease reset the server or try to debug it"
                       },
-                 '2': { 'file' : 'n-cpu.log',
+                 '855578': { 'file' : 'n-cpu.log',
                         'pattern': "libvirtError: Failed to connect socket to",
                         'msg': "PLease restart libvirtd-bin service"
                       },
-                 '3': { 'file': 'stack.sh.log',
+                 'networking_issue': { 'file': 'stack.sh.log',
                         'pattern': "Unable to look up git.openstack.org",
                         'msg': "PLease rerun the job again"
                       },
-                 '4': { 'file': 'stack.sh.log',
+                 'git_clone_failed': { 'file': 'stack.sh.log',
                         'pattern': "git call failed",
                         'msg': "PLease rerun the job again"
                       },
