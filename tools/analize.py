@@ -30,6 +30,10 @@ known_issues = { 'loop_device': { 'file': 'stack.sh.log',
                  'stack_failed': { 'file': 'stack.sh.log',
                         'pattern': "exit",
                         'msg': "stack.sh failed. please check"
+                      },
+                 'tempest_install': { 'file': 'stack.sh.log',
+                        'pattern': "tempest does not match installed location of tempest",
+                        'msg': "stack.sh failed with tempest install. please check"
                       }
 
                }
