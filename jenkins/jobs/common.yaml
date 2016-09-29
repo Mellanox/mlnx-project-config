@@ -38,7 +38,7 @@
 
             pip --version
             pip freeze > $CI_ARTIFACTS/env/pip-freeze-env.txt
-            [ -d /opt/stack/tempest/virt ] && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
+            [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             dpkg --list > $CI_ARTIFACTS/env/dpkg.txt
             sudo lvs > $CI_ARTIFACTS/env/lvs.txt
             env > $CI_ARTIFACTS/env/environment.txt
@@ -336,6 +336,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -364,7 +365,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:10
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${epioib_port}
+          OVS_PHYSICAL_BRIDGE=br-$epioib_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -434,6 +435,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -460,7 +462,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -510,6 +512,7 @@
           SWIFT_HASH=password
           SWIFT_ENABLE_TEMPURLS=True
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           RECLONE=yes
           USE_SCREEN=True
           # Logging
@@ -525,7 +528,7 @@
           PHYSICAL_INTERFACE=$epioib_port
           PHYSICAL_NETWORK=default
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$epioib_port
 
           disable_service n-net n-novnc horizon
           disable_service heat h-api h-api-cfn h-api-cw h-eng
@@ -652,6 +655,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           epioib_port=$epioib_port
@@ -680,7 +684,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:10
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-${epioib_port}
+          OVS_PHYSICAL_BRIDGE=br-$epioib_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -752,6 +756,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -778,7 +783,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -839,6 +844,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -865,7 +871,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -926,6 +932,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -952,7 +959,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -1013,6 +1020,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -1039,7 +1047,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           SERVICE_HOST=$CONTROLLER_NODE
           MYSQL_HOST=$CONTROLLER_NODE
           RABBIT_HOST=$CONTROLLER_NODE
@@ -1106,6 +1114,7 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -1132,7 +1141,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-\${PHYSICAL_INTERFACE}
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
@@ -1231,7 +1240,14 @@
             cd /opt/stack/tempest
             tests=ironic_tempest_plugin.tests.api
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
+            #tox -eall ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
+
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1293,9 +1309,12 @@
             )
             cd /opt/stack/tempest
             testr list-tests ${tests[@]}
-
-            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
-
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1319,8 +1338,13 @@
             )
             cd /opt/stack/tempest
             testr list-tests ${tests[@]}
-
-            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            ls -la
+            deactivate
 
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1354,8 +1378,12 @@
                 )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf -V -n --serial ${tests[@]}
-
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1385,8 +1413,12 @@
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf --serial tempest.scenario.test_network_basic_ops -V -n
-            #./run_tempest.sh -N -C etc/tempest.conf --serial ${tests[@]} -V -n
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run tempest.scenario.test_network_basic_ops
+            deactivate
 
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1405,7 +1437,13 @@
             echo "STARTED: ############## $phase  ###################"
             neutron net-list
             cd /opt/stack/tempest
-            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
+
             cd -
 
 
@@ -1425,7 +1463,12 @@
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf --serial tempest.scenario.test_network_advanced_server_ops -V -n
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
 
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
@@ -1450,7 +1493,13 @@
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf -V -n --serial ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
+
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1561,7 +1610,13 @@
 
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
-            ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            deactivate
+
             test_pass=$?
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1595,6 +1650,7 @@
           fi
           sudo chown -R stack $CI_ARTIFACTS
 
+          #$WORKSPACE/../analize.py $CI_ARTIFACTS/logs 2>&1|tee
           $WORKSPACE/mlnx-project-config/tools/analize.py $CI_ARTIFACTS/logs 2>&1|tee
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
@@ -1676,6 +1732,7 @@
           git fetch
           git checkout $ZUUL_BRANCH
           git pull
+          #git checkout 890342ed878f4a8f556ae733b6bd6c872308a937
 
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
@@ -1764,6 +1821,7 @@
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -1775,13 +1833,16 @@
 
           LOGDIR=\${LOGDIR:-/opt/stack/logs}
           LOGFILE=\$LOGDIR/stack.sh.log
-          SCREEN_LOGDIR=$LOGDIR/screen
+          SCREEN_LOGDIR=\$LOGDIR/screen
           LOGDAYS=2
 
           disable_service n-net heat h-api h-api-cfn h-api-cw h-eng n-cauth q-lbaas
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           disable_service n-novnc n-xvnc horizon
           enable_service tempest
+          mlnx_dev=$mlnx_dev
+          mlnx_port=$mlnx_port
+          epioib_port=$epioib_port
 
           #Neutron Configuration
           Q_PLUGIN=ml2
@@ -1794,12 +1855,12 @@
           Q_ML2_TENANT_NETWORK_TYPE=vlan
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-${PHYSICAL_INTERFACE}
+          PHYSICAL_INTERFACE=$mlnx_port
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           Q_USE_SECGROUP=True
           PHYSICAL_NETWORK=default
-          PHYSICAL_INTERFACE=$mlnx_port
 
           SWIFT_HASH=password
           SWIFT_REPLICAS=1
@@ -1854,6 +1915,7 @@
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -1867,7 +1929,7 @@
 
           LOGDIR=\${LOGDIR:-/opt/stack/logs}
           LOGFILE=\$LOGDIR/stack.sh.log
-          SCREEN_LOGDIR=$LOGDIR/screen
+          SCREEN_LOGDIR=\$LOGDIR/screen
           LOGDAYS=2
 
           disable_service n-net heat h-api h-api-cfn h-api-cw h-eng q-lbaas n-cauth
@@ -1886,12 +1948,12 @@
           Q_ML2_TENANT_NETWORK_TYPE=vlan
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-${PHYSICAL_INTERFACE}
+          PHYSICAL_INTERFACE=$mlnx_port
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           Q_USE_SECGROUP=True
           PHYSICAL_NETWORK=default
-          PHYSICAL_INTERFACE=$mlnx_port
 
           SWIFT_HASH=password
           SWIFT_REPLICAS=1
@@ -1962,7 +2024,13 @@
                 )
                 cd /opt/stack/tempest
                 testr list-tests ${tests[@]}
-                ./run_tempest.sh -N -C etc/tempest.conf --serial -V -n ${tests[@]}
+                testr init
+                virtualenv virt --no-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+                testr run ${tests[@]}
+                deactivate
+
                 test_pass=$?
 
                 #sudo ifconfig $mlnx_port down
