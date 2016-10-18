@@ -442,7 +442,7 @@
     name: 'Debian-networking-mlnx-build'
     node: master
     triggers:
-      - timed: '@daily'
+      - timed: 'H 0 * * *'
       - pollurl:
           cron: 'H * * * *'
           urls:
@@ -479,8 +479,8 @@
     name: Mellanox-CI-Daily-StableNewton-Status
     project-type: multijob
     node:  master
-#    triggers:
-#      - timed: '@daily'
+    triggers:
+#      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Nova
@@ -546,7 +546,7 @@
     project-type: multijob
     node:  master
     triggers:
-      - timed: '@daily'
+      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Nova
@@ -613,7 +613,7 @@
     project-type: multijob
     node:  master
     triggers:
-      - timed: '@daily'
+      - timed: 'H 0 * * *'
     builders:
        - multijob:
            name: Nova
