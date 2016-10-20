@@ -166,7 +166,7 @@
             fi
 
             sudo rm -f /var/log/apache2/keystone*
-            #sudo rm -rf /usr/lib/python2.7/site-packages/tempest*
+            sudo rm -rf /usr/lib/python2.7/site-packages/tempest*
 
             #Cleaning semaphores"
             for sem in `ipcs -s | grep root|awk '{print $2}'`; do
@@ -310,11 +310,14 @@
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
-
-          if [ $ZUUL_BRANCH != 'master' ]; then
+          #TODO add 'stable/ocata' for ocata
+          if [ $ZUUL_BRANCH != 'master' ] ; then
               export MLNX_DRIVER='mlnx'
+              export PCI_WHITE_LIST="pci_"
           else
               export MLNX_DRIVER='mlnx_infiniband'
+              export PCI_WHITE_LIST="[pci]
+          "
           fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
@@ -382,8 +385,8 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ovs]
           of_interface=ovs-ofctl
@@ -424,6 +427,10 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
           fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -476,8 +483,8 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
@@ -632,8 +639,11 @@
 
           if [ "$ZUUL_BRANCH" != 'master' ]; then
               export MLNX_DRIVER='sdnmechdriver,mlnx'
+              export PCI_WHITE_LIST="pci_"
           else
               export MLNX_DRIVER='mlnx_sdn_assist,mlnx_infiniband'
+              export PCI_WHITE_LIST="[pci]
+          "
           fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
@@ -700,8 +710,8 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [sdn]
           url = http://127.0.0.1/neo
@@ -745,6 +755,10 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
           fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -797,9 +811,9 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           supported_pci_vendor_devs=15b3:1014
@@ -833,6 +847,10 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
           fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -885,9 +903,9 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
@@ -921,6 +939,10 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
           fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -973,9 +995,9 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
@@ -1008,8 +1030,11 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+             export PCI_WHITE_LIST="pci_"
           fi
-
           env
           export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-22"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -1067,9 +1092,9 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
@@ -1099,6 +1124,10 @@
               export EXTENSION="extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
           fi
 
           env
@@ -1152,9 +1181,9 @@
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
