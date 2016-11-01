@@ -70,6 +70,14 @@
         - 'Cinder-ISER-LIO'
 
 - project:
+    name: Cinder-ISER-LIO-SimX
+    github-org: openstack-dev
+    node: CINDER-SIMX
+    jobs:
+        - 'Cinder-ISER-LIO-SimX'
+
+
+- project:
     name: Debian-networking-mlnx-build
     jobs:
         - 'Debian-networking-mlnx-build'
@@ -101,3 +109,10 @@
     node: SRIOV_MN_COMPUTE
     jobs:
         - 'Nova-ML2-Sriov-Multinode-StopCompute'
+
+- project:
+    name: SimX-Run-VM
+    github-org: openstack-dev
+    node: SimX-Server
+    jobs:
+        - 'SimX-Run-VM'

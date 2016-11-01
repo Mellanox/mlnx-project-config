@@ -249,9 +249,6 @@
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
 
-            # https://review.openstack.org/#/c/365333
-            #sudo sed -i -r 's/^cgroup_device_acl = \[$/cgroup_device_acl = \[\"\/dev\/vfio\/vfio\",/g' /etc/libvirt/qemu.conf
-            #sudo systemctl restart libvirt-bin 2>&1|tee
 
 - builder:
     name: apply-workarounds-tempest
@@ -317,6 +314,11 @@
           else
               export MLNX_DRIVER='mlnx_infiniband'
               export PCI_WHITE_LIST="[pci]
+          "
+          fi
+          if [$ZUUL_BRANCH == 'stable/mitaka' ]; then
+              export OVS_WA="[ovs]
+          of_interface=ovs-ofctl
           "
           fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
@@ -388,8 +390,7 @@
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
-          [ovs]
-          of_interface=ovs-ofctl
+          ${OVS_WA}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           suspend=false
@@ -645,6 +646,12 @@
               export PCI_WHITE_LIST="[pci]
           "
           fi
+
+          if [$ZUUL_BRANCH == 'stable/mitaka' ]; then
+              export OVS_WA="[ovs]
+          of_interface=ovs-ofctl
+          "
+          fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
@@ -718,8 +725,7 @@
           domain = cloudx
           username = admin
           password = admin
-          [ovs]
-          of_interface=ovs-ofctl
+          ${OVS_WA}
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           resize=false
@@ -1178,6 +1184,7 @@
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
           enable_plugin neutron git://git.openstack.org/openstack/neutron
+          #TEMPEST_BRANCH='refs/changes/98/348498/6 refs/changes/30/339230/8'
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1517,6 +1524,7 @@
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
                   tempest.scenario.test_server_migrate.TestServerMultinode.test_migrate_nodes
                   tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration_revert
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
@@ -2065,6 +2073,43 @@
                 fi
 
 - builder:
+    name: run-tests-cinder-lio-simx
+    builders:
+      - shell: |
+                #!/bin/bash +ex
+
+                HCA=${HCA:-"mlx4"}
+                mlx=`echo $HCA | sed s/mlx//g`
+                let mlx=mlx-1
+                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
+
+                sudo ifconfig $mlnx_port 1.1.1.1/32 up
+
+                echo "============ Starting tempest tests ====================="
+                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
+                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
+                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       tempest.scenario.test_stamp_pattern.TestStampPattern
+                )
+                cd /opt/stack/tempest
+                testr list-tests ${tests[@]}
+                testr init
+                virtualenv virt --no-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+                testr run ${tests[@]}
+                test_pass=$?
+                deactivate
+
+                if [[ $test_pass -ne 0 ]]; then
+                    echo "FINISHED with ERROR: ############## $phase  ###################"
+                    exit 1
+                fi
+
+
+- builder:
     name: mlnx-debian-build
     builders:
       - shell: |
@@ -2105,4 +2150,50 @@
 
                sys.exit(find_last_jobs('mitaka-jessie.pkgs.mirantis.com', 'networking-mlnx'))
 
+- builder:
+    name: load-vm
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="Loading VM $SIMX_VM"
+            echo "STARTED: ############## $phase  ###################"
+            sudo ls /var/lib/libvirt/images
+            sudo virsh shutdown --domain $SIMX_VM
+            #TODO add while it's not shuted down
+            sleep 20
+            sudo virsh snapshot-revert --domain $SIMX_VM --snapshotname $SIMX_SNAPSHOT --running
+            #TODO add wait for running
 
+- builder:
+    name: waitforonline-vm
+    builders:
+        - python: |
+            #!/usr/bin/python
+            import requests
+            import sys
+            import time
+            import os
+            from pprint import pprint
+
+            timeout = 300
+            stop = time.time() + timeout
+            SIMX_VM = os.environ['SIMX_VM']
+            pprint(os.environ)
+            phase="Waiting for Online status of %s" % SIMX_VM
+            print phase
+            url = 'http://10.224.33.37:8080/computer/%s/api/json' % SIMX_VM
+            start = time.time()
+            print "Started", start
+            print "Time", time.time()
+            while (time.time() < stop):
+                r = requests.get(url)
+                if r.json()['offline']:
+                    time.sleep(2)
+                else:
+                    t = (time.time() - start)
+                    print "%s is Online after %d sec" % (SIMX_VM, t)
+                    time.sleep(20)
+                    sys.exit(0)
+            print "%s still Offline after %s seconds" % (SIMX_VM, timeout)
+            pprint(r.json())
+            sys.exit(1)

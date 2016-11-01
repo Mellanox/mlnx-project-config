@@ -32,7 +32,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -79,7 +79,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -126,7 +126,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -167,7 +167,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -215,7 +215,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -256,7 +256,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -300,7 +300,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -336,7 +336,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -377,11 +377,100 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
           subject: cinder job is being failed, please debug
+          failure: true
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log
+    wrappers:
+      - timeout:
+          timeout: 320
+          fail: true
+
+- job-template:
+    name: 'Cinder-ISER-LIO-SimX'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-Cinder-ISER-LIO
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - run-tests-cinder-lio-simx
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 500
+    publishers:
+      - email-ext:
+          recipients: mlnx-openstack-ci@dev.mellanox.co.il
+          subject: cinder job is being failed, please debug
+          failure: true
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+      - upload-console-log
+    wrappers:
+      - timeout:
+          timeout: 320
+          fail: true
+
+- job-template:
+    name: 'SimX-Run-VM'
+    node: '{node}'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.69.151.247
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            IMAGE_SERVER=13.69.151.247
+            PATH=$PATH:/usr/sbin
+            SIMX_VM=cloudx-17-04
+            SIMX_SNAPSHOT=Simx2.1.2038
+#      - check-environment
+#      - mlnx-project-config
+#      - clean-environment
+#      - clone-devstack
+#      - apply-workarounds-pre-stack
+#      - configure-devstack-Cinder-ISER-LIO
+#      - run-stacksh # Running Devstack
+#      - apply-workarounds-post-stack
+      - load-vm
+      - waitforonline-vm
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 500
+    publishers:
+      - email-ext:
+          recipients: mlnx-openstack-ci@dev.mellanox.co.il
+          subject: SimX job is being failed, please debug
           failure: true
       - build-publisher:
           name: MellanoxAzureServer
@@ -421,7 +510,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: mlnx-openstack-ci@dev.mellanox.co.il
@@ -462,7 +551,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -480,7 +569,7 @@
     project-type: multijob
     node:  master
     triggers:
-#      - timed: 'H 0 * * *'
+      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Nova
@@ -531,7 +620,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -597,7 +686,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -640,7 +729,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -682,12 +771,60 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
           publish-unstable-builds: true
           publish-failed-builds: true
+
+
+######################################################
+###               SimX NODE CI     ##################
+######################################################
+- job:
+    name: Mellanox-CI-SimX
+    project-type: multijob
+    node:  master
+#    triggers:
+#      - timed: 'H 0 * * *'
+    builders:
+       - multijob:
+           name: Simx
+           condition: ALWAYS
+           projects:
+              - name: SimX-Run-VM
+                current-parameters: true
+                predefined-parameters: |
+                   HCA=mlx5
+                   FORCE=yes
+#              - name: Cinder-ISER-LIO-SimX
+#                current-parameters: true
+#                predefined-parameters: |
+#                   HCA=mlx5
+#                   FORCE=yes
+              - name: Cinder-ISER-ISCSI-SimX
+                current-parameters: true
+                predefined-parameters: |
+                   HCA=mlx5
+                   FORCE=yes
+    properties:
+      - build-discarder:
+          days-to-keep: 100
+          num-to-keep: 1000
+          artifact-days-to-keep: 100
+          artifact-num-to-keep: 500
+    publishers:
+      - build-publisher:
+          name: MellanoxAzureServer
+          publish-unstable-builds: true
+          publish-failed-builds: true
+    wrappers:
+      - timeout:
+          timeout: 500
+
+
+
 
 
 ######################################################
@@ -720,7 +857,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -754,7 +891,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -783,7 +920,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -811,7 +948,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
@@ -855,7 +992,7 @@
           days-to-keep: 100
           num-to-keep: 1000
           artifact-days-to-keep: 100
-          artifact-num-to-keep: 1000
+          artifact-num-to-keep: 500
     publishers:
       - build-publisher:
           name: MellanoxAzureServer
