@@ -205,7 +205,7 @@ pipelines:
 
 jobs:
   - name: Neutron-ML2-Sriov
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -228,7 +228,7 @@ jobs:
           - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
   - name: Neutron-ML2-MLNX
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka/stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -251,7 +251,7 @@ jobs:
           - ^neutron/plugins/ml2/drivers/mech_sriov/.*$
 
   - name: Neutron-Networking-MLNX-ML2
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -263,7 +263,7 @@ jobs:
 
 
   - name: Nova-ML2-Sriov
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -290,7 +290,7 @@ jobs:
           - ^tox.ini$
 
   - name: Nova-MACVTAP-ML2-Sriov
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -313,22 +313,18 @@ jobs:
       - '^tempest/common/.*$'
       - '^tempest/.*$'
 
-  - name: Nova-ML2-Sriov-Multinode
+  - name: Nova-ML2-Sriov-Multinode-Tempest
     branch: master
     voting: false
-    skip-if:
-      - all-files-match-any:
-          - ^.*\.rst$
-          - ^doc/.*$
-          - ^nova/tests/.*$
-          - ^nova/virt/baremetal/.*$
-          - ^nova/virt/hyperv/.*$
-          - ^nova/virt/ironic/.*$
-          - ^nova/virt/vmwareapi/.*$
-          - ^nova/virt/xenapi/.*$
-          - ^tools/.*$
-          - ^tox.ini$
+    files:
+      - '^tempest/scenario/.*$'
+      - '^tempest/common/.*$'
 
+  - name: Nova-ML2-Sriov-Multinode
+    branch: ^(master).*$
+    voting: false
+    files:
+      - '^nova/pci'
 
 
   - name: NOOP
@@ -336,11 +332,11 @@ jobs:
 
   - name: Cinder-ISER-ISCSI
     voting: true
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
 
   - name: Cinder-ISER-LIO
     voting: true
-    branch: ^(master|stable/liberty|stable/mitaka).*$
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
 
 
 projects:
@@ -357,8 +353,12 @@ projects:
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
-#    check-mlnx-multinode:
-#      - Nova-ML2-Sriov-Multinode
+    check-mlnx-multinode:
+      - Nova-ML2-Sriov-Multinode
+
+  - name: openstack/tempest
+    check-sriov-tempest:
+      - Nova-ML2-Sriov-Multinode-Tempest
 
 #  - name: openstack/tempest
 #    check-sriov-tempest:
@@ -368,9 +368,9 @@ projects:
 #    check-ironic-ib:
 #        - Ironic-IB
 
-#  - name: openstack-dev/ci-sandbox
-#    check-sandbox:
-#        - NOOP
+  - name: openstack-dev/ci-sandbox
+    check-sandbox:
+        - NOOP
 
   - name: openstack/cinder
     check-cinder:

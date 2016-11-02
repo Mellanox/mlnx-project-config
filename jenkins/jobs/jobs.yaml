@@ -961,6 +961,7 @@
     name: Nova-ML2-Sriov-Multinode
     project-type: multijob
     node: master
+    concurrent: false
     builders:
        - multijob:
            name: Controller

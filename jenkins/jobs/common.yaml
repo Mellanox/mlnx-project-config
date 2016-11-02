@@ -751,7 +751,8 @@
           HCA=${HCA:-"mlx5"}
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
+          #export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
+          export mlnx_dev=`lspci |grep Mell| grep Virtual| grep "\-$mlx" |head -n1|awk '{print $1}' | cut -d'.' -f1`
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
@@ -1522,9 +1523,8 @@
             tests=(
                   #TOFIX tests fail unless nova sch is restarted. Seems that sch ignoring schedule_hints
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
-                  tempest.scenario.test_server_migrate.TestServerMultinode.test_migrate_nodes
-                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration
                   tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration_revert
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
