@@ -46,5 +46,5 @@ sync
 arch=${log_file}.gz
 sudo rm -rf $arch
 gzip -9 -r $log_file 2>&1|tee >/dev/null
-scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}
+scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}/${NODE_TYPE}/
 rm -rf $arch $log_dir
