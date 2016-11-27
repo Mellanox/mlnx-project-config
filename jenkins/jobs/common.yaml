@@ -49,6 +49,7 @@
             sudo cp /var/log/messages $CI_ARTIFACTS/env/
             sudo cp /var/log/syslog $CI_ARTIFACTS/env/
             sudo ps -ef > $CI_ARTIFACTS/env/procs.log
+            ofed_info -s > $CI_ARTIFACTS/env/ofed,info
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -81,6 +82,7 @@
 - builder:
     name: clean-environment
     builders:
+        - delete-mac-nova
         - shell: |
             #!/bin/bash -x
             phase="CLEAN-ENVIRONMENT"
@@ -142,20 +144,19 @@
 
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
 
+            cd $WORKSPACE/devstack
 
-            for file in `ls /opt/stack/*/requirements.txt`
-            do
-              sudo pip uninstall -r $file -y 2>&1|tee > /dev/null
+            for i in $(pip list|grep -v pip|grep -v pkg_resources| grep -v jinja2| grep -v setuptools|awk '{print $1}'); do
+              sudo pip uninstall $i -y
             done
 
-            #sudo pip install setuptools==20.1.1
             sudo pip install pbr
-            #sudo pip install eventlet
             sudo pip install six
             sudo pip install jinja2
-            #sudo pip install urllib3 --upgrade
-            sudo pip install docutils -y
+            sudo pip install docutils
             sudo pip install oslo.privsep
+            sudo apt-get install python-docutils -y 2>&1|tee
+            sudo yum install python-docutils -y 2>&1|tee
 
             sudo yum install python-requests rabbitmq-server -y
 
@@ -199,15 +200,7 @@
             fi
 
 
-            for folder in `find /opt/stack -type d -maxdepth 1`; do
-                pushd $folder
-                echo "Cleaning $PWD"
-                git checkout master
-                git checkout .
-                git pull
-                git clean -d -f -x
-                popd
-            done
+            sudo rm -rf /opt/stack
             env
             echo "FINISHED:############## $phase  ###################"
 
@@ -284,12 +277,6 @@
       - shell: |
           #!/bin/bash -ex
           env
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev | grep ${HCA}_0 | grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
-          if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
-              exit 1
-          fi
           echo "Hello World from "$(hostname)
 
 
@@ -308,7 +295,7 @@
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
           #TODO add 'stable/ocata' for ocata
-          if [ $ZUUL_BRANCH != 'master' ] ; then
+          if [ $ZUUL_BRANCH != 'master' ]; then
               export MLNX_DRIVER='mlnx'
               export PCI_WHITE_LIST="pci_"
           else
@@ -342,7 +329,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -444,7 +431,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -521,7 +508,7 @@
           SWIFT_HASH=password
           SWIFT_ENABLE_TEMPURLS=True
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           RECLONE=yes
           USE_SCREEN=True
           # Logging
@@ -673,7 +660,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           epioib_port=$epioib_port
@@ -751,7 +738,6 @@
           HCA=${HCA:-"mlx5"}
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
-          #export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
           export mlnx_dev=`lspci |grep Mell| grep Virtual| grep "\-$mlx" |head -n1|awk '{print $1}' | cut -d'.' -f1`
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -778,7 +764,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -823,7 +809,7 @@
           ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
-          supported_pci_vendor_devs=15b3:1014
+          supported_pci_vendor_devs=15b3:1014,15b3:1016
           [agent]
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
@@ -870,7 +856,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -962,7 +948,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -1053,7 +1039,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -1137,6 +1123,9 @@
               export PCI_WHITE_LIST="pci_"
           fi
 
+          if [ -z "$ZUUL_CHANGES" ] || [ -z $(echo $ZUUL_CHANGES |egrep "348498") ]; then
+              export TEMPEST_BRANCH=${TEMPEST_BRANCH:-"'refs/changes/98/348498/8'"}
+          fi
           env
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1151,7 +1140,7 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
           PUBLIC_INTERFACE=$mlnx_port
@@ -1186,6 +1175,7 @@
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
           enable_plugin neutron git://git.openstack.org/openstack/neutron
           #TEMPEST_BRANCH='refs/changes/98/348498/6 refs/changes/30/339230/8'
+          TEMPEST_BRANCH=$TEMPEST_BRANCH
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1196,7 +1186,7 @@
           [ml2_sriov]
           agent_required=True
           [agent]
-          supported_pci_vendor_devs = 15b3:1004, 15b3:1014
+          supported_pci_vendor_devs = 15b3:1004,15b3:1014
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
@@ -1264,8 +1254,10 @@
           #For latest Ubuntu
           #export FORCE=yes
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
-             $WORKSPACE/devstack/unstack.sh 2>&1|tee > /dev/null
+             $WORKSPACE/devstack/unstack.sh 2>&1|tee
           fi
+          #sudo yum remove  openvswitch -y
+          #sudo apt-get remove openvswitch-switch -y
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1519,6 +1511,7 @@
         - shell: |
             #!/bin/bash
             phase="RUN-TESTS-MULTINODE"
+            [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
             echo "STARTED: ############## $phase  ###################"
             tests=(
                   #TOFIX tests fail unless nova sch is restarted. Seems that sch ignoring schedule_hints
@@ -1664,11 +1657,12 @@
     name: collect-artifacts
     builders:
       - shell: |
-          #!/bin/bash -eE
+          #!/bin/bash -x
+          #   /bin/bash -eEx
           phase="COLLECT-ARTIFACTS"
           echo "STARTED: ############## $phase  ###################"
           CI_ARTIFACTS=$(dirname ${LOGDIR})
-          dmesg > $CI_ARTIFACTS/logs/dmesg.log
+          dmesg -T 2>&1|tee > $CI_ARTIFACTS/logs/dmesg.log
           echo "TGT Status"
           sudo service tgt status 2>&1 |tee
 
@@ -1685,8 +1679,7 @@
           fi
           sudo chown -R stack $CI_ARTIFACTS
 
-          #$WORKSPACE/../analize.py $CI_ARTIFACTS/logs 2>&1|tee
-          $WORKSPACE/mlnx-project-config/tools/analize.py $CI_ARTIFACTS/logs 2>&1|tee
+          [ -d $WORKSPACE/mlnx-project-config ] && $WORKSPACE/mlnx-project-config/tools/analize.py $CI_ARTIFACTS/logs 2>&1|tee
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
           rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
@@ -1694,10 +1687,10 @@
           grep -rn Traceb $source/logs/*.log 2>&1|tee > $source/logs/exceptions.txt
 
           gzip -9 -r $source 2>&1|tee > /dev/null
-          rm -rf $CI_ARTIFACTS
+          rm -rf $CI_ARTIFACTS 2>&1|tee
           cp -r $source $CI_ARTIFACTS
           chmod +r -R $CI_ARTIFACTS
-          rm -rf $source
+          rm -rf $source 2>&1|tee
 
           # NOTE: this is based on the fact that all MultiNode nodes labled as SRIOV_MN_CONTROLLER
           # or SRIOV_MN_COMPUTE
@@ -1758,16 +1751,13 @@
 
           devstack_repo=git://git.openstack.org/openstack-dev/devstack
           [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
-          #if [[ ! -d $WORKSPACE/devstack ]];then
           git clone $devstack_repo
-          #fi
           pushd $WORKSPACE/devstack
 
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
           git fetch
           git checkout $ZUUL_BRANCH
           git pull
-          #git checkout 890342ed878f4a8f556ae733b6bd6c872308a937
 
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
@@ -1856,7 +1846,7 @@
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -1865,7 +1855,7 @@
 
           LIBS_FROM_GIT=os-brick
           RECLONE=yes
-
+          LOG_COLOR=False
           LOGDIR=\${LOGDIR:-/opt/stack/logs}
           LOGFILE=\$LOGDIR/stack.sh.log
           SCREEN_LOGDIR=\$LOGDIR/screen
@@ -1950,7 +1940,7 @@
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/8
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -1961,7 +1951,8 @@
 
           LIBS_FROM_GIT=os-brick
           RECLONE=yes
-
+          LOG_COLOR=False
+          PIP_UPGRADE=True
           LOGDIR=\${LOGDIR:-/opt/stack/logs}
           LOGFILE=\$LOGDIR/stack.sh.log
           SCREEN_LOGDIR=\$LOGDIR/screen
@@ -2047,7 +2038,7 @@
                 let mlx=mlx-1
                 export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
 
-                sudo ifconfig $mlnx_port 1.1.1.1/32 up
+                sudo ifconfig $mlnx_port 1.1.1.1/16 up
 
                 echo "============ Starting tempest tests ====================="
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
@@ -2083,13 +2074,50 @@
                 let mlx=mlx-1
                 export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
 
-                sudo ifconfig $mlnx_port 1.1.1.1/32 up
+                sudo ifconfig $mlnx_port 1.1.1.1/16 up
 
                 echo "============ Starting tempest tests ====================="
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
                        tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       tempest.scenario.test_stamp_pattern.TestStampPattern
+                )
+                cd /opt/stack/tempest
+                testr list-tests ${tests[@]}
+                testr init
+                test_pass=0
+                virtualenv virt --no-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+                testr run ${tests[@]}
+                test_pass=$?
+                deactivate
+
+                if [[ $test_pass -ne 0 ]]; then
+                    echo "FINISHED with ERROR: ############## $phase  ###################"
+                    exit 1
+                fi
+
+- builder:
+    name: run-tests-cinder-iscsi-simx
+    builders:
+      - shell: |
+                #!/bin/bash +ex
+
+                HCA=${HCA:-"mlx4"}
+                mlx=`echo $HCA | sed s/mlx//g`
+                let mlx=mlx-1
+                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
+
+                sudo ifconfig $mlnx_port 1.1.1.1/16 up
+
+                echo "============ Starting tempest tests ====================="
+                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
+                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
+                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
                        #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
@@ -2158,11 +2186,23 @@
             phase="Loading VM $SIMX_VM"
             echo "STARTED: ############## $phase  ###################"
             sudo ls /var/lib/libvirt/images
-            sudo virsh shutdown --domain $SIMX_VM
+            sudo virsh shutdown --domain $SIMX_VM 2>&1|tee
             #TODO add while it's not shuted down
-            sleep 20
+            virsh list | grep $SIMX_VM
+            sleep 120
             sudo virsh snapshot-revert --domain $SIMX_VM --snapshotname $SIMX_SNAPSHOT --running
-            #TODO add wait for running
+            retries=10
+            while [ $retries -gt 0 ]; do
+                state=$(sudo virsh list | grep $SIMX_VM | awk '{print $3}')
+                if [ $state == 'running'  ]; then
+                    echo "$SIMX_VM is running"
+                    exit 0
+                fi
+                let retries=retries-1
+                sleep 6
+            done
+            echo "$SIMX_VM is not running"
+            exit 1
 
 - builder:
     name: waitforonline-vm

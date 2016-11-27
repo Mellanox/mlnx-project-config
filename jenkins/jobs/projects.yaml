@@ -9,16 +9,15 @@
     name: Neutron-ML2-Sriov
     github-org: openstack-dev
     node: ETH_CX34
-
     jobs:
-      - Neutron-ML2-Sriov
+      - 'Neutron-ML2-Sriov'
 
 - project:
     name: Neutron-Networking-MLNX-ML2
     github-org: openstack-dev
     node: SRIOV_IB
     jobs:
-        - Neutron-Networking-MLNX-ML2
+        - 'Neutron-Networking-MLNX-ML2'
 
 - project:
     name: Nova-ML2-Sriov
@@ -26,6 +25,14 @@
     node: ETH_CX34
     jobs:
         - 'Nova-ML2-Sriov'
+
+- project:
+    name: Nova-ML2-Sriov-Test
+    github-org: openstack-dev
+    node: ETH_CX34_TEST
+    jobs:
+        - 'Nova-ML2-Sriov-Test'
+
 
 - project:
     name: Nova-MACVTAP-ML2-Sriov
@@ -70,18 +77,12 @@
         - 'Cinder-ISER-LIO'
 
 - project:
-    name: Cinder-ISER-LIO-SimX
-    github-org: openstack-dev
-    node: CINDER-SIMX
-    jobs:
-        - 'Cinder-ISER-LIO-SimX'
-
-
-- project:
     name: Debian-networking-mlnx-build
     jobs:
         - 'Debian-networking-mlnx-build'
 
+
+########### MultiNode ##########################
 - project:
     name: Nova-ML2-Sriov-Multinode-Controller
     github-org: openstack-dev
@@ -109,6 +110,21 @@
     node: SRIOV_MN_COMPUTE
     jobs:
         - 'Nova-ML2-Sriov-Multinode-StopCompute'
+
+########### SimX #############################
+- project:
+    name: SimX-Run-ISER-LIO
+    github-org: openstack-dev
+    node: CINDER-SIMX-LIO
+    jobs:
+        - 'SimX-Run-ISER-LIO'
+
+- project:
+    name: SimX-Run-ISER-ISCSI
+    github-org: openstack-dev
+    node: CINDER-SIMX-ISCSI
+    jobs:
+        - 'SimX-Run-ISER-ISCSI'
 
 - project:
     name: SimX-Run-VM

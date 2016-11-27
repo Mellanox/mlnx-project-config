@@ -249,6 +249,19 @@ jobs:
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
           - ^neutron/plugins/ml2/drivers/mech_sriov/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/brocade/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/freescale/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/hyperv/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/ibm/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/l2pop/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/linuxbridge/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/mech_bigswitch/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/ofagent/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/opendaylight/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/openvswitch/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/mech_sriov/.*$
+
 
   - name: Neutron-Networking-MLNX-ML2
     branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
@@ -313,18 +326,14 @@ jobs:
       - '^tempest/common/.*$'
       - '^tempest/.*$'
 
-  - name: Nova-ML2-Sriov-Multinode-Tempest
-    branch: master
-    voting: false
-    files:
-      - '^tempest/scenario/.*$'
-      - '^tempest/common/.*$'
-
   - name: Nova-ML2-Sriov-Multinode
     branch: ^(master).*$
     voting: false
     files:
-      - '^nova/pci'
+      - '^nova/pci/.*$'
+      - '^nova/objects/pci.*$'
+      - '^nova/scheduler/filters/numa_topology_filter.py'
+      - '^nova/scheduler/filters/pci_passthrough_filter.py'
 
 
   - name: NOOP
@@ -350,15 +359,15 @@ projects:
       - Neutron-Networking-MLNX-ML2
 
   - name: openstack/nova
+    check-mlnx-multinode:
+      - Nova-ML2-Sriov-Multinode
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
-    check-mlnx-multinode:
-      - Nova-ML2-Sriov-Multinode
 
   - name: openstack/tempest
     check-sriov-tempest:
-      - Nova-ML2-Sriov-Multinode-Tempest
+      - Nova-ML2-Sriov-Multinode
 
 #  - name: openstack/tempest
 #    check-sriov-tempest:
