@@ -107,7 +107,7 @@
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
             if [ ! -d $WORKSPACE/devstack ]; then
-                git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
+                git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
             fi
             echo "Cleaning up possible remainings of previous builds."
             $WORKSPACE/devstack/clean.sh 2>&1|tee > /dev/null
@@ -145,9 +145,8 @@
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
 
             cd $WORKSPACE/devstack
-
-            for i in $(pip list|grep -v pip|grep -v pkg_resources| grep -v jinja2| grep -v setuptools|awk '{print $1}'); do
-              sudo pip uninstall $i -y
+            for i in $(pip list|grep -v pip|awk '{print $1}'); do
+                sudo pip uninstall $i -y;
             done
 
             sudo pip install pbr
@@ -199,7 +198,6 @@
                 sudo /sbin/ipoibd -D eth_ipoib & 2>&1|tee > /dev/null
             fi
 
-
             sudo rm -rf /opt/stack
             env
             echo "FINISHED:############## $phase  ###################"
@@ -250,11 +248,6 @@
             #!/bin/bash -x
             phase="APPLY-WORKAROUNDS-POST-TEMPEST"
             echo "STARTED: ############## $phase  ###################"
-            # Migration patch
-            #cd /opt/stack/tempest
-            #git fetch https://git.openstack.org/openstack/tempest refs/changes/30/339230/4 && git cherry-pick FETCH_HEAD
-
-
 
 
 - builder:
@@ -391,6 +384,21 @@
           [compute]
           flavor_ref=2
           flavor_ref_alt=2
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          suspend=false
+          resize=false
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          port_admin_state_change=false
+          [scenario]
+          dhcp_client=
+          [compute]
+          flavor_ref=2
+          flavor_ref_alt=2
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -484,6 +492,14 @@
           port_vnic_type=direct
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -599,11 +615,12 @@
           clean_nodes=false
           deploy_callback_timeout=600
 
-          [[post-extra|\$TEMPEST_CONFIG]]
+          [[test-config|\$TEMPEST_CONFIG]]
           [auth]
           use_dynamic_credentials = True
           [baremetal]
           infrastructure_type = infiniband
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -725,6 +742,18 @@
           [compute]
           flavor_ref=2
           flavor_ref_alt=2
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          resize=false
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          port_admin_state_change=false
+          [scenario]
+          dhcp_client=
+          [compute]
+          flavor_ref=2
+          flavor_ref_alt=2
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -753,7 +782,7 @@
           else
               export PCI_WHITE_LIST="pci_"
           fi
-
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -773,6 +802,7 @@
           LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
+          PIP_UPGRADE=yes
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -798,7 +828,7 @@
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
-          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
           USE_SCREEN=True
@@ -816,6 +846,12 @@
           [compute-feature-enabled]
           [network]
           port_vnic_type=macvtap
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=macvtap
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -845,7 +881,7 @@
           else
               export PCI_WHITE_LIST="pci_"
           fi
-
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -890,7 +926,7 @@
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
-          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
           USE_SCREEN=True
@@ -908,6 +944,12 @@
           [compute-feature-enabled]
           [network]
           port_vnic_type=direct
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=direct
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -937,7 +979,7 @@
           else
               export PCI_WHITE_LIST="pci_"
           fi
-
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -982,7 +1024,7 @@
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
-          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
           USE_SCREEN=True
@@ -1000,6 +1042,12 @@
           [compute-feature-enabled]
           [network]
           port_vnic_type=direct
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          [network]
+          port_vnic_type=direct
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1028,6 +1076,7 @@
           else
              export PCI_WHITE_LIST="pci_"
           fi
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           env
           export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-22"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -1080,7 +1129,7 @@
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-qos,q-sriov-agt
-          enable_plugin neutron git://git.openstack.org/openstack/neutron
+          enable_plugin neutron $NEUTRON_REPO
           disable_service tempest n-cauth
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
@@ -1088,6 +1137,7 @@
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          allow_resize_to_same_host = False
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           [ml2_sriov]
           agent_required=True
@@ -1126,6 +1176,7 @@
           if [ -z "$ZUUL_CHANGES" ] || [ -z $(echo $ZUUL_CHANGES |egrep "348498") ]; then
               export TEMPEST_BRANCH=${TEMPEST_BRANCH:-"'refs/changes/98/348498/8'"}
           fi
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           env
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1173,7 +1224,7 @@
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
-          enable_plugin neutron git://git.openstack.org/openstack/neutron
+          enable_plugin neutron $NEUTRON_REPO
           #TEMPEST_BRANCH='refs/changes/98/348498/6 refs/changes/30/339230/8'
           TEMPEST_BRANCH=$TEMPEST_BRANCH
           USE_SCREEN=True
@@ -1195,6 +1246,15 @@
           min_compute_nodes=2
           [network]
           port_vnic_type=direct
+          [[test-config|\$TEMPEST_CONFIG]]
+          [compute-feature-enabled]
+          migrate=True
+          [compute]
+          min_compute_nodes=2
+          [network]
+          port_vnic_type=direct
+
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1212,7 +1272,8 @@
               git pull
               popd
           else
-              git clone https://github.com/Mellanox/mlnx-project-config.git
+              #git clone https://github.com/Mellanox/mlnx-project-config.git
+              git clone ssh://cloudx-17/images/openstack/mlnx-project-config
           fi
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1749,7 +1810,7 @@
           phase="CLONE-DEVSTACK"
           echo "STARTED: ############## $phase  ###################"
 
-          devstack_repo=git://git.openstack.org/openstack-dev/devstack
+          devstack_repo=ssh://cloudx-17/images/openstack/devstack
           [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
           git clone $devstack_repo
           pushd $WORKSPACE/devstack
@@ -1919,6 +1980,13 @@
           backend2_name = backend2
           [volume-feature-enabled]
           multi_backend = True
+          [[test-config|\$TEMPEST_CONFIG]]
+          [volume]
+          backend1_name = backend1
+          backend2_name = backend2
+          [volume-feature-enabled]
+          multi_backend = True
+
 
           EOF
 
@@ -2024,6 +2092,12 @@
           backend2_name = backend2
           [volume-feature-enabled]
           multi_backend = True
+          [[test-config|\$TEMPEST_CONFIG]]
+          [volume]
+          backend1_name = backend1
+          backend2_name = backend2
+          [volume-feature-enabled]
+          multi_backend = True
           EOF
 
 
@@ -2080,20 +2154,25 @@
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest
                 testr list-tests ${tests[@]}
                 testr init
                 test_pass=0
-                virtualenv virt --no-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
-                test_pass=$?
-                deactivate
+                for test in ${tests[@]}; do
+                    testr run $test
+                    rc=$?
+                    let test_pass=test_pass+$rc
+                done
+                #virtualenv virt --no-site-packages
+                #. virt/bin/activate
+                #virt/bin/pip install -U -r requirements.txt
+                #testr run ${tests[@]}
+                #test_pass=$?
+                #deactivate
 
                 if [[ $test_pass -ne 0 ]]; then
                     echo "FINISHED with ERROR: ############## $phase  ###################"
