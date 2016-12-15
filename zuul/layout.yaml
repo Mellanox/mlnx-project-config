@@ -334,6 +334,7 @@ jobs:
       - '^nova/objects/pci.*$'
       - '^nova/scheduler/filters/numa_topology_filter.py'
       - '^nova/scheduler/filters/pci_passthrough_filter.py'
+      - '^nova/compute/.*$'
 
 
   - name: NOOP

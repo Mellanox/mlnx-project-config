@@ -149,14 +149,13 @@
                 sudo pip uninstall $i -y;
             done
 
+            sudo apt-get install python-docutils python-pkg-resources -y 2>&1|tee
+            sudo yum install python-docutils python-pkg-resources -y 2>&1|tee
             sudo pip install pbr
             sudo pip install six
             sudo pip install jinja2
             sudo pip install docutils
             sudo pip install oslo.privsep
-            sudo apt-get install python-docutils -y 2>&1|tee
-            sudo yum install python-docutils -y 2>&1|tee
-
             sudo yum install python-requests rabbitmq-server -y
 
             [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
@@ -1266,15 +1265,8 @@
           #!/bin/bash +ex
           phase="EXTERNAL-TESTING-CHECKOUT"
           echo "STARTED: ############## $phase  ###################"
-          if [ -d $WORKSPACE/mlnx-project-config ];then
-              pushd $WORKSPACE/mlnx-project-config
-              git checkout .
-              git pull
-              popd
-          else
-              #git clone https://github.com/Mellanox/mlnx-project-config.git
-              git clone ssh://cloudx-17/images/openstack/mlnx-project-config
-          fi
+          [ -d $WORKSPACE/mlnx-project-config ] && rm -rf $WORKSPACE/mlnx-project-config
+          git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1489,20 +1481,7 @@
             #!/bin/bash
             phase="RUN-TESTS-NETWORK-BASIC"
             echo "STARTED: ############## $phase  ###################"
-            tests=(
-                #tempest.scenario.test_network_basic_ops
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_hotplug_nic
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_port_security_macspoofing_port
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_subnet_details
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_instance_port_admin_state
-                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
-            )
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
             testr init
             virtualenv virt --no-site-packages
             . virt/bin/activate
@@ -1773,6 +1752,7 @@
 
           if [ -f $CI_ARTIFACTS/testr_results.html.gz ]; then
               echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/testr_results.html.gz"
+              echo "Devstack configuration: http://$ip/$UPLOAD_LOGPATH/local.conf.gz"
           fi
 
           if [ ! -z "$LOG_PATH" ]; then
@@ -1869,9 +1849,6 @@
         - shell: |
             #!/bin/bash
             phase="DELETE_MAC_NOVA"
-            if [[ "$ZUUL_BRANCH" == "master" || -z "$ZUUL_BRANCH" ]]; then
-                exit 0
-            fi
             echo "STARTED: ############## $phase  ###################"
             ADD_MAC='/tmp/add_mac.sh'
             HCA=${HCA:-"mlx4"}
