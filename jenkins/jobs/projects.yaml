@@ -76,11 +76,6 @@
     jobs:
         - 'Cinder-ISER-LIO'
 
-- project:
-    name: Debian-networking-mlnx-build
-    jobs:
-        - 'Debian-networking-mlnx-build'
-
 
 ########### MultiNode ##########################
 - project:

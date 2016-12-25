@@ -1077,7 +1077,7 @@
           fi
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           env
-          export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-22"}
+          export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-27"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -2192,47 +2192,6 @@
                     exit 1
                 fi
 
-
-- builder:
-    name: mlnx-debian-build
-    builders:
-      - shell: |
-               #!/usr/bin/python
-               import json
-               import urllib2
-               import sys
-               import os
-               #import ssl
-               #from pprint import pprint
-               #ssl._create_default_https_context = ssl._create_unverified_context
-
-               #curl http://10.209.32.40:8080/job/Check-MLNX-Neutron-ML2-driver/lastBuild/api/json 2>/dev/null|python -m json.tool  |grep openstack
-               #https://mitaka-jessie.pkgs.mirantis.com/job/networking-mlnx/api/json
-
-               MLNX_CI = [{'Jenkins' :'mitaka-jessie.pkgs.mirantis.com', 'Projects': ['networking-mlnx',],}]
-
-               HISTORY_JOBS=10
-
-               def find_last_jobs(jenkins, project):
-                   status = 0
-                   url = 'https://%s/job/%s/api/json' % ( jenkins, project )
-                   l = json.load(urllib2.urlopen(url))
-                   last_jobs = []
-                   for job_id in l['builds'][0:HISTORY_JOBS]:
-                       last_jobs.append(job_id['url'])
-
-                   for job in last_jobs:
-                       j = json.load(urllib2.urlopen('%s/api/json' % job))
-                       print "%s    %s" % (j['result'], j['url'])
-                       if j['result'] == 'SUCCESS':
-                           continue
-
-                       if j['result'] == 'FAILURE': # or j['result'] == "ABORTED"
-                        status = 1
-
-                   return status
-
-               sys.exit(find_last_jobs('mitaka-jessie.pkgs.mirantis.com', 'networking-mlnx'))
 
 - builder:
     name: load-vm
