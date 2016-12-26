@@ -34,11 +34,11 @@ known_issues = { 'loop_device': { 'file': 'stack.sh.log',
                  'tempest_install': { 'file': 'stack.sh.log',
                         'pattern': "tempest does not match installed location of tempest",
                         'msg': "stack.sh failed with tempest install. please check"
-                      },
-                 '1618382': { 'file': 'q-svc.log',
-                        'pattern': "StaleDataError: UPDATE statement on table ",
-                        'msg': "https://bugs.launchpad.net/neutron/+bug/1618382 Reproduced"
-                      }                        
+                      }
+                 #'1618382': { 'file': 'q-svc.log',
+                 #       'pattern': "StaleDataError: UPDATE statement on table ",
+                 #       'msg': "https://bugs.launchpad.net/neutron/+bug/1618382 Reproduced"
+                 #     }
 
                }
 
