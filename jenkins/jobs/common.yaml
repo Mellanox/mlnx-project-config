@@ -41,7 +41,7 @@
             [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             dpkg --list > $CI_ARTIFACTS/env/dpkg.txt
             sudo lvs > $CI_ARTIFACTS/env/lvs.txt
-            env > $CI_ARTIFACTS/env/environment.txt
+            env |sort > $CI_ARTIFACTS/env/environment.txt
             ifconfig > $CI_ARTIFACTS/env/ifconfig.txt
             sudo ovs-vsctl show > $CI_ARTIFACTS/env/ovs-vsctl.txt
             sudo lspci|grep Mellanox > $CI_ARTIFACTS/env/lspci.txt
@@ -402,6 +402,108 @@
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
+    name: configure-devstack-Neutron-MACVTAP-ML2-Sriov
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Neutron-ML2-Sriov"
+          echo "STARTED: ############## $phase  ###################"
+          echo $PATH
+          HCA=${HCA:-"mlx4"}
+          mlx=`echo $HCA | sed s/mlx//g`
+          let mlx=mlx-1
+          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
+          if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              exit 1
+          fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
+          fi
+
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+          mlnx_dev=$mlnx_dev
+          mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          # Services
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-xvnc n-novnc horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          agent_required=True
+          [ml2_sriov]
+          supported_pci_vendor_devs=15b3:1014,15b3:1016
+          [agent]
+          $EXTENSION
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=macvtap
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+
+          [[test-config|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=macvtap
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+
+
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
     name: configure-devstack-Neutron-ML2-Sriov
     builders:
       - shell: |
@@ -486,19 +588,15 @@
           [agent]
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
           [[test-config|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
-
-
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -753,6 +851,7 @@
           [compute]
           flavor_ref=2
           flavor_ref_alt=2
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -842,11 +941,9 @@
           [agent]
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=macvtap
           [[test-config|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=macvtap
 
@@ -940,11 +1037,9 @@
           [agent]
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
           [[test-config|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
 
@@ -1038,14 +1133,11 @@
           [agent]
           $EXTENSION
           [[post-extra|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
           [[test-config|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
           [network]
           port_vnic_type=direct
-
 
           EOF
           echo "FINISHED: ############## $phase  ###################"
@@ -1142,6 +1234,7 @@
           agent_required=True
           [agent]
           $EXTENSION
+
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1172,9 +1265,6 @@
               export PCI_WHITE_LIST="pci_"
           fi
 
-          if [ -z "$ZUUL_CHANGES" ] || [ -z $(echo $ZUUL_CHANGES |egrep "348498") ]; then
-              export TEMPEST_BRANCH=${TEMPEST_BRANCH:-"'refs/changes/98/348498/8'"}
-          fi
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           env
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -1224,8 +1314,6 @@
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
           enable_plugin neutron $NEUTRON_REPO
-          #TEMPEST_BRANCH='refs/changes/98/348498/6 refs/changes/30/339230/8'
-          TEMPEST_BRANCH=$TEMPEST_BRANCH
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1252,7 +1340,6 @@
           min_compute_nodes=2
           [network]
           port_vnic_type=direct
-
 
           EOF
           echo "FINISHED: ############## $phase  ###################"
@@ -1957,6 +2044,7 @@
           backend2_name = backend2
           [volume-feature-enabled]
           multi_backend = True
+
           [[test-config|\$TEMPEST_CONFIG]]
           [volume]
           backend1_name = backend1
@@ -2069,6 +2157,7 @@
           backend2_name = backend2
           [volume-feature-enabled]
           multi_backend = True
+
           [[test-config|\$TEMPEST_CONFIG]]
           [volume]
           backend1_name = backend1

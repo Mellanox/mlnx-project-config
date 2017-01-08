@@ -227,6 +227,30 @@ jobs:
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
           - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
+  - name: Neutron-MACVTAP-ML2-Sriov
+    branch: ^(master|stable/liberty|stable/mitaka|stable/newton).*$
+    voting: true
+    skip-if:
+      - all-files-match-any:
+          - ^.*\.rst$
+          - ^doc/.*$
+          - ^neutron/db/.*$
+          - ^tools/.*$
+          - ^tox.ini$
+          - ^neutron/plugins/ml2/drivers/brocade/.*$
+          - ^neutron/plugins/ml2/drivers/freescale/.*$
+          - ^neutron/plugins/ml2/drivers/hyperv/.*$
+          - ^neutron/plugins/ml2/drivers/ibm/.*$
+          - ^neutron/plugins/ml2/drivers/l2pop/.*$
+          - ^neutron/plugins/ml2/drivers/linuxbridge/.*$
+          - ^neutron/plugins/ml2/drivers/mech_bigswitch/.*$
+          - ^neutron/plugins/ml2/drivers/ofagent/.*$
+          - ^neutron/plugins/ml2/drivers/opendaylight/.*$
+          - ^neutron/plugins/ml2/drivers/openvswitch/.*$
+          - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/plugins/ml2/drivers/mlnx/.*$
+
+
   - name: Neutron-ML2-MLNX
     branch: ^(master|stable/liberty|stable/mitaka/stable/newton).*$
     voting: true
@@ -354,7 +378,7 @@ projects:
     check-mlnx:
       - Neutron-ML2-MLNX
       - Neutron-ML2-Sriov
-
+      - Neutron-MACVTAP-ML2-Sriov
   - name: openstack/networking-mlnx
     check-networking-mlnx:
       - Neutron-Networking-MLNX-ML2

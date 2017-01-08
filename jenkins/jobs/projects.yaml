@@ -33,13 +33,19 @@
     jobs:
         - 'Nova-ML2-Sriov-Test'
 
-
 - project:
     name: Nova-MACVTAP-ML2-Sriov
     github-org: openstack-dev
     node: ETH_CX34
     jobs:
         - 'Nova-MACVTAP-ML2-Sriov'
+
+- project:
+    name: Neutron-MACVTAP-ML2-Sriov
+    github-org: openstack-dev
+    node: ETH_CX34
+    jobs:
+        - 'Neutron-MACVTAP-ML2-Sriov'
 
 - project:
     name: Ironic-IB
