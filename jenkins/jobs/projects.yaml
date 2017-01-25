@@ -27,6 +27,14 @@
         - 'Nova-ML2-Sriov'
 
 - project:
+    name: Nova-ML2-Sriov-Mitaka
+    github-org: openstack-dev
+    node: ETH_CX34_MITAKA
+    jobs:
+        - 'Nova-ML2-Sriov-Mitaka'
+
+
+- project:
     name: Nova-ML2-Sriov-Test
     github-org: openstack-dev
     node: ETH_CX34_TEST
