@@ -49,7 +49,7 @@
             sudo cp /var/log/messages $CI_ARTIFACTS/env/
             sudo cp /var/log/syslog $CI_ARTIFACTS/env/
             sudo ps -ef > $CI_ARTIFACTS/env/procs.log
-            ofed_info -s > $CI_ARTIFACTS/env/ofed,info
+            ofed_info -s > $CI_ARTIFACTS/env/ofed.info
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -499,6 +499,102 @@
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
 
 
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-Neutron-ML2-Sriov-CX5
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Neutron-ML2-Sriov-CX5"
+          echo "STARTED: ############## $phase  ###################"
+          echo $PATH
+          HCA=${HCA:-"mlx4"}
+          mlx=`echo $HCA | sed s/mlx//g`
+          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
+          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
+          if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              exit 1
+          fi
+          if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+              export EXTENSION="extensions=fdb
+          [FDB]
+          shared_physical_device_mappings=default:${mlnx_port}"
+              export PCI_WHITE_LIST="[pci]
+          "
+          else
+              export PCI_WHITE_LIST="pci_"
+          fi
+
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          MULTI_HOST=False
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+          mlnx_dev=$mlnx_dev
+          mlnx_port=$mlnx_port
+          PUBLIC_INTERFACE=$mlnx_port
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=${mlnx_port}
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          # Services
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-xvnc n-novnc horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          # Optional, to enable tempest configuration as part of devstack
+          enable_service tempest
+          USE_SCREEN=True
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
+          ${PCI_WHITE_LIST}passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [ml2_sriov]
+          agent_required=True
+          [agent]
+          $EXTENSION
+          [[post-extra|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=normal
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+          [[test-config|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=normal
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1521,6 +1617,33 @@
                 exit 1
             fi
             echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-Neutron-ML2-Sriov-CX5-API
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-Neutron-ML2-Sriov-CX5-API"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(tempest.api.network
+            )
+            #tempest.api.compute)
+            cd /opt/stack/tempest
+            testr list-tests ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            test_pass=$?
+            deactivate
+
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
 
 - builder:
     name: run-tests-Neutron-Networking-MLNX-ML2

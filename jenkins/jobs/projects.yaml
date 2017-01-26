@@ -13,6 +13,13 @@
       - 'Neutron-ML2-Sriov'
 
 - project:
+    name: Neutron-ML2-Sriov-CX5
+    github-org: openstack-dev
+    node: ETH_CX35
+    jobs:
+      - 'Neutron-ML2-Sriov-CX5'
+
+- project:
     name: Neutron-Networking-MLNX-ML2
     github-org: openstack-dev
     node: SRIOV_IB
