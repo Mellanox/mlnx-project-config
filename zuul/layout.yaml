@@ -402,9 +402,9 @@ projects:
 #    check-ironic-ib:
 #        - Ironic-IB
 
-  - name: openstack-dev/ci-sandbox
-    check-sandbox:
-        - NOOP
+#  - name: openstack-dev/ci-sandbox
+#    check-sandbox:
+#        - NOOP
 
   - name: openstack/cinder
     check-cinder:

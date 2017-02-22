@@ -139,7 +139,7 @@
             sudo kill -9 $(pgrep rabbitmq)
             sudo kill -9 $(pgrep beam.smp)
             sudo kill -9 $(ps -ef |grep swift | grep pyth | awk '{print $2}')
-            sudo kill -9 $(ps -ef |grep neutron-openvswitch-agent | grep -v grep | awk '{print $2}')
+            sudo kill -9 $(ps -ef |grep neutron | grep -v grep | awk '{print $2}')
             kill -9 $(ps -ef |grep add_mac | grep -v grep | awk '{print $2}') 2>&1|tee > /dev/null
 
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
@@ -295,7 +295,7 @@
               export PCI_WHITE_LIST="[pci]
           "
           fi
-          if [$ZUUL_BRANCH == 'stable/mitaka' ]; then
+          if [ $ZUUL_BRANCH == 'stable/mitaka' ]; then
               export OVS_WA="[ovs]
           of_interface=ovs-ofctl
           "
@@ -491,14 +491,15 @@
           port_vnic_type=macvtap
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
-
+          [compute-feature-enabled]
+          resize=false
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=macvtap
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
-
-
+          [compute-feature-enabled]
+          resize=false
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -844,7 +845,7 @@
           "
           fi
 
-          if [$ZUUL_BRANCH == 'stable/mitaka' ]; then
+          if [ $ZUUL_BRANCH == 'stable/mitaka' ]; then
               export OVS_WA="[ovs]
           of_interface=ovs-ofctl
           "
@@ -1039,10 +1040,13 @@
           [[post-extra|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=macvtap
+          [compute-feature-enabled]
+          resize=false
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=macvtap
-
+          [compute-feature-enabled]
+          resize=false
 
           EOF
           echo "FINISHED: ############## $phase  ###################"
@@ -1316,6 +1320,7 @@
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-qos,q-sriov-agt
+          enable_service placement-api
           enable_plugin neutron $NEUTRON_REPO
           disable_service tempest n-cauth
           USE_SCREEN=True
@@ -1408,7 +1413,7 @@
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu placement-api
           enable_plugin neutron $NEUTRON_REPO
           USE_SCREEN=True
           [[post-config|\$NOVA_CONF]]
@@ -1445,10 +1450,11 @@
     name: mlnx-project-config
     builders:
        - shell: |
-          #!/bin/bash +ex
+          #!/bin/bash -x
           phase="EXTERNAL-TESTING-CHECKOUT"
           echo "STARTED: ############## $phase  ###################"
           [ -d $WORKSPACE/mlnx-project-config ] && rm -rf $WORKSPACE/mlnx-project-config
+
           git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1467,7 +1473,6 @@
           fi
 
           export ESWITCHD_BRANCH="master"
-
           BUILD_ID=dontKillMe $WORKSPACE/devstack/stack.sh
           rc=$?
 
@@ -1477,6 +1482,7 @@
           fi
           echo "############## Stack is up and running ###################"
           echo "FINISHED: ############## $phase  ###################"
+          sleep 240
           exit 0
 
 - builder:
@@ -1589,6 +1595,31 @@
             echo "FINISHED: ############## $phase  ###################"
 
 - builder:
+    name: run-tests-Neutron-ML2-Sriov-CX5-API
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-Neutron-ML2-Sriov-CX5-API"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(tempest.api.network
+            )
+            cd /opt/stack/tempest
+            testr list-tests ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            test_pass=$?
+            deactivate
+
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
     name: run-tests-Neutron-ML2-Sriov-API
     builders:
         - shell: |
@@ -1619,24 +1650,19 @@
             echo "FINISHED: ############## $phase  ###################"
 
 - builder:
-    name: run-tests-Neutron-ML2-Sriov-CX5-API
+    name: run-tests-neutron
     builders:
         - shell: |
             #!/bin/bash
-            phase="RUN-TESTS-Neutron-ML2-Sriov-CX5-API"
+            phase="RUN-TESTS-Neutron"
             echo "STARTED: ############## $phase  ###################"
-            tests=(tempest.api.network
-            )
-            #tempest.api.compute)
             cd /opt/stack/tempest
-            testr list-tests ${tests[@]}
+            test_list=/tmp/tempst_list_$$
             testr init
-            virtualenv virt --no-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api.test_extensions.ExtensionsTest|neutron.tests.tempest.scenario.test_qos.QoSTest" > $test_list
+            testr run --load-list=$test_list
             test_pass=$?
-            deactivate
+            rm -f $test_list
 
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -1916,16 +1942,20 @@
           echo "TGT Status"
           sudo service tgt status 2>&1 |tee
 
-          testrepository=/opt/stack/tempest/.testrepository/0
-          if [[ -f $testrepository ]]; then
-              pushd /opt/stack/tempest/.testrepository
-              tmp_subunit=/tmp/tempest_results_$$
-              for file in `find . -regex '.*[0-9][0-9]?'`
-                  do cat $file >> $tmp_subunit
-              done
+          tmp_subunit=/tmp/tempest_results_$$
+          for results in '/opt/stack/neutron' '/opt/stack/tempest'; do
+              testrepository=$results/.testrepository/0
+              if [[ -f $testrepository ]]; then
+                  pushd $results/.testrepository
+                  for file in `find . -regex '.*[0-9][0-9]?'`
+                      do cat $file >> $tmp_subunit
+                  done
+                  popd
+              fi
+          done
+          if [ -f $tmp_subunit ]; then
               $WORKSPACE/mlnx-project-config/tools/subunit2html.py $tmp_subunit $CI_ARTIFACTS/testr_results.html
               rm -f $tmp_subunit
-              popd
           fi
           sudo chown -R stack $CI_ARTIFACTS
 
@@ -2000,9 +2030,9 @@
           phase="CLONE-DEVSTACK"
           echo "STARTED: ############## $phase  ###################"
 
-          devstack_repo=ssh://cloudx-17/images/openstack/devstack
           [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
-          git clone $devstack_repo
+
+          git clone ssh://cloudx-17/images/openstack/devstack
           pushd $WORKSPACE/devstack
 
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
@@ -2343,8 +2373,8 @@
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest
@@ -2410,6 +2440,7 @@
     builders:
         - shell: |
             #!/bin/bash -x
+            SIMX_VM=${SIMX_VM:-'cloudx-17-07'}
             phase="Loading VM $SIMX_VM"
             echo "STARTED: ############## $phase  ###################"
             sudo ls /var/lib/libvirt/images
@@ -2442,9 +2473,10 @@
             import os
             from pprint import pprint
 
-            timeout = 300
+            timeout = 500
             stop = time.time() + timeout
-            SIMX_VM = os.environ['SIMX_VM']
+
+            SIMX_VM = os.environ.get('SIMX_VM','cloudx-17-07')
             pprint(os.environ)
             phase="Waiting for Online status of %s" % SIMX_VM
             print phase

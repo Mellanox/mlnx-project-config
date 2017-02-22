@@ -377,6 +377,9 @@
       - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
+      - add-mac-nova # workaround to add mac to the bridge
+      - run-tests-neutron
+      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -650,6 +653,7 @@
       - configure-devstack-Cinder-ISER-LIO
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
+      #- run-tests-cinder
       - run-tests-cinder-lio-simx
       - produce-readme-file
     properties:
@@ -697,7 +701,8 @@
       - configure-devstack-Cinder-ISER-ISCSI
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - run-tests-cinder-iscsi-simx
+      - run-tests-cinder
+      #- run-tests-cinder-iscsi-simx
       - produce-readme-file
     properties:
       - build-discarder:
@@ -730,7 +735,7 @@
             HCA=mlx5
             IMAGE_SERVER=13.69.151.247
             PATH=$PATH:/usr/sbin
-            SIMX_SNAPSHOT=Simx2.1.2070.nosriov
+            SIMX_SNAPSHOT=Simx2.4-2359_20170214
       - load-vm
       - waitforonline-vm
       - produce-readme-file

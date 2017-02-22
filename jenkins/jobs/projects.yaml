@@ -40,7 +40,6 @@
     jobs:
         - 'Nova-ML2-Sriov-Mitaka'
 
-
 - project:
     name: Nova-ML2-Sriov-Test
     github-org: openstack-dev
