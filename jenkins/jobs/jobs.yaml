@@ -5,18 +5,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            HCA=mlx5
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -36,9 +37,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -55,19 +56,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
             ZUUL_BRANCH=stable/mitaka
             FORCE=yes
       - check-environment
@@ -81,9 +82,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -101,19 +102,20 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -133,9 +135,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -154,18 +156,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -184,9 +187,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -204,18 +207,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            HCA=mlx5
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -234,9 +238,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -254,18 +258,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -278,9 +283,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -298,18 +303,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -329,9 +335,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -349,18 +355,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            HCA=mlx5
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -370,6 +377,9 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - delete-mac-nova # remove macs
+      #- add-mac-nova # workaround to add mac to the bridge
+      #- run-tests-neutron
+      #- delete-mac-nova # remove macs
       #- 'run-tests-{name}-API'
       - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
@@ -377,15 +387,12 @@
       - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
       - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
-      - run-tests-neutron
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -402,18 +409,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -433,9 +441,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -453,19 +461,20 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -478,9 +487,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -498,19 +507,20 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -526,9 +536,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -546,19 +556,20 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
 #      - check-environment
       - mlnx-project-config
 #      - clean-environment
@@ -566,9 +577,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -586,18 +597,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -610,9 +622,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -633,18 +645,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -658,9 +671,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -681,18 +694,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -706,9 +720,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -730,20 +744,21 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             SIMX_SNAPSHOT=Simx2.4-2359_20170214
+            FORCE=yes
       - load-vm
       - waitforonline-vm
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -764,18 +779,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -788,9 +804,9 @@
       - produce-readme-file
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - email-ext:
@@ -803,13 +819,74 @@
           timeout: 320
           fail: true
 
+- job:
+    name: Mellanox-CI-StableNewton-Test
+    project-type: multijob
+    node:  master
+#    triggers:
+#      - timed: 'H 0 * * *'
+    builders:
+      - multijob:
+           name: Mellanox-CI-Daily-StableNewton-Status
+           condition: ALWAYS
+           projects:
+#              - name: Nova-ML2-Sriov
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Nova-MACVTAP-ML2-Sriov
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Tempest-Sriov
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Neutron-ML2-Sriov
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Neutron-ML2-MLNX
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Neutron-Networking-MLNX-ML2
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+#              - name: Cinder-ISER-LIO
+#                current-parameters: true
+#                predefined-parameters: |
+#                   ZUUL_BRANCH=stable/newton
+#                   FORCE=yes
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/newton
+                   FORCE=yes
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 500
+    wrappers:
+      - timeout:
+          timeout: 500
+
 
 - job:
     name: Mellanox-CI-Daily-StableNewton-Status
     project-type: multijob
     node:  master
-    triggers:
-      - timed: 'H 0 * * *'
+#    triggers:
+#      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Mellanox-CI-Daily-StableNewton-Status
@@ -857,9 +934,9 @@
                    FORCE=yes
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     wrappers:
       - timeout:
@@ -869,8 +946,8 @@
     name: Mellanox-CI-Daily-StableMitaka-Status
     project-type: multijob
     node:  master
-    triggers:
-      - timed: 'H 0 * * *'
+#    triggers:
+#      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Mellanox-CI-Daily-StableMitaka-Status
@@ -918,9 +995,70 @@
 #                   FORCE=yes
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 500
+    wrappers:
+      - timeout:
+          timeout: 500
+
+- job:
+    name: Mellanox-CI-Daily-StableOcata-Status
+    project-type: multijob
+    node:  master
+#    triggers:
+#      - timed: 'H 0 * * *'
+    builders:
+      - multijob:
+           name: Mellanox-CI-Daily-StableOcata-Status
+           condition: ALWAYS
+           projects:
+              - name: Nova-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Nova-MACVTAP-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Tempest-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Neutron-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Neutron-ML2-MLNX
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Neutron-Networking-MLNX-ML2
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     wrappers:
       - timeout:
@@ -950,20 +1088,21 @@
                 current-parameters: true
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
-              - name: Cinder-ISER-LIO
-                current-parameters: true
-              - name: Cinder-ISER-ISCSI
-                current-parameters: true
+#              - name: Cinder-ISER-LIO
+#                current-parameters: true
+#              - name: Cinder-ISER-ISCSI
+#                current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
               - name: Neutron-MACVTAP-ML2-Sriov
                 current-parameters: true
-
+              - name: OVS_HW_offload
+                current-parameters: true
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     wrappers:
       - timeout:
@@ -1002,9 +1141,9 @@
                    FORCE=yes
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     wrappers:
       - timeout:
@@ -1039,9 +1178,9 @@
                    FORCE=yes
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     wrappers:
       - timeout:
@@ -1063,18 +1202,18 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -1086,9 +1225,9 @@
       - apply-workarounds-tempest
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - upload-console-log-mn #This line must be the last one
@@ -1102,19 +1241,19 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            TEMPEST_REPO=ssh://cloudx-17/images/openstack/tempest
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -1125,9 +1264,9 @@
       - apply-workarounds-post-stack
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - upload-console-log-mn #This line must be the last one
@@ -1141,28 +1280,28 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            CINDER_REPO=ssh://cloudx-17/images/openstack/cinder
-            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
-            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
-            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
-            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
-            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
-            NOVA_REPO=ssh://cloudx-17/images/openstack/nova
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            NOVA_REPO=git://git.openstack.org/openstack/nova
       - mlnx-project-config
       - run-tests-multinode
       - stop-stacksh
       - delete-mac-nova
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - upload-console-log-mn #This line must be the last one
@@ -1177,19 +1316,19 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=13.69.151.247
+            EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx4
-            IMAGE_SERVER=13.69.151.247
+            IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
        - stop-stacksh
        - delete-mac-nova
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500
     publishers:
       - upload-console-log-mn #This line must be the last one
@@ -1228,7 +1367,7 @@
                 current-parameters: true
     properties:
       - build-discarder:
-          days-to-keep: 100
-          num-to-keep: 1000
-          artifact-days-to-keep: 100
+          days-to-keep: 70
+          num-to-keep: 300
+          artifact-days-to-keep: 70
           artifact-num-to-keep: 500

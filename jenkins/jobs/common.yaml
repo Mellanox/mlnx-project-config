@@ -9,8 +9,9 @@
                 exit 1
             fi
 
-            for i in `ibdev2netdev | awk '{print $5}'`; do
+            for i in `ifconfig  -a | egrep -v "^ |^$|br|lo|ovs"|awk '{print $1}'|cut -d':' -f1`;do
                 sudo ifconfig $i up
+                sleep 1
             done
 
             sudo killall -9 radvd 2>&1|tee > /dev/null
@@ -21,7 +22,15 @@
                 echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg"
                 exit 1
             fi
+            # Workaround for Ub16.04
+            sudo sh -c  "echo 4 > /sys/class/infiniband/mlx5_0/device/mlx5_num_vfs" 2>&1|tee > /dev/null
+            sudo sh -c  "echo 4 > /sys/class/infiniband/mlx5_1/device/mlx5_num_vfs" 2>&1|tee > /dev/null
+            sudo timedatectl set-timezone 'Asia/Jerusalem'
             env
+
+            git config --global user.email lennyb@mellanox.com
+            git config --global  user.name "Lenny Verkhovsky"
+
             echo "Environment is OK"
 
 
@@ -38,8 +47,14 @@
 
             pip --version
             pip freeze > $CI_ARTIFACTS/env/pip-freeze-env.txt
-            [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate && pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
-            dpkg --list > $CI_ARTIFACTS/env/dpkg.txt
+            [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate
+            pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
+            cat /etc/issue|grep -i 'ubuntu'
+            if [ -z $? ]; then
+                dpkg --list|sort > $CI_ARTIFACTS/env/packages.txt
+            else
+                rpm -qa| sort > $CI_ARTIFACTS/env/packages.txt
+            fi
             sudo lvs > $CI_ARTIFACTS/env/lvs.txt
             env |sort > $CI_ARTIFACTS/env/environment.txt
             ifconfig > $CI_ARTIFACTS/env/ifconfig.txt
@@ -47,9 +62,10 @@
             sudo lspci|grep Mellanox > $CI_ARTIFACTS/env/lspci.txt
             sudo uname -a > $CI_ARTIFACTS/env/uname.txt
             sudo cp /var/log/messages $CI_ARTIFACTS/env/
-            sudo cp /var/log/syslog $CI_ARTIFACTS/env/
             sudo ps -ef > $CI_ARTIFACTS/env/procs.log
-            ofed_info -s > $CI_ARTIFACTS/env/ofed.info
+
+            [ -f /usr/bin/ofed_info ] && /usr/bin/ofed_info -s 2>&1| tee > $CI_ARTIFACTS/env/ofed.info
+
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
@@ -76,13 +92,24 @@
             sudo cp /var/log/libvirt/libvirtd.log $LOGDIR
             sudo cp -r /var/log/libvirt/qemu $LOGDIR
 
+            pushd /opt/stack
+            for folder in $(ls -l /opt/stack| egrep -v "log|status"| grep ^d| awk '{print $9}'); do
+                mkdir -p $CI_ARTIFACTS/logs/$folder
+                pushd $folder
+                git status > $CI_ARTIFACTS/logs/${folder}/git_status.txt
+                git log > $CI_ARTIFACTS/logs/${folder}/git_log.txt
+                git show > $CI_ARTIFACTS/logs/${folder}/git_show.txt
+                popd
+            done
+
+
             exit 0
 
 
 - builder:
     name: clean-environment
     builders:
-        - delete-mac-nova
+        #- delete-mac-nova
         - shell: |
             #!/bin/bash -x
             phase="CLEAN-ENVIRONMENT"
@@ -92,6 +119,10 @@
             sudo find /tmp -type d -mtime +1 -exec sudo rm -rf {} \;
             echo "Deleting archives older than 10 days from /var/log"
             sudo rm -f `sudo find /var/log -name *.gz`
+            if [ -x /usr/bin/journalctl ]; then
+                sudo journalctl --vacuum-size=10M
+                sudo journalctl --vacuum-time=1d
+            fi
 
             rm -rf ~/.cache/*
             sudo rm -rf /root/.cache/pip
@@ -100,17 +131,16 @@
             sudo sh -c "> /var/log/libvirt/libvirtd.log"
             sudo rm -f `sudo find /var/log -name *.log.*`
 
-            sudo dpkg --configure -a
+            [[ $(cat /etc/issue|grep -i 'ubuntu') ]] && sudo dpkg --configure -a
             sudo dmesg -c > /dev/null
             sudo sh -c "> /var/log/messages"
 
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
-            if [ ! -d $WORKSPACE/devstack ]; then
-                git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
-            fi
+            [ ! -d $WORKSPACE/devstack/ ] && git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
+            #[ ! -d $WORKSPACE/devstack/ ] && git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
             echo "Cleaning up possible remainings of previous builds."
-            $WORKSPACE/devstack/clean.sh 2>&1|tee > /dev/null
+            $WORKSPACE/devstack/clean.sh
 
             # Remove stack screens leftovers
             sudo screen -wipe
@@ -123,13 +153,6 @@
                 sudo lvs
                 sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
                 sudo service tgt restart > /dev/null 2>&1 || true
-            fi
-
-            # https://redmine.mtl.com/issues/855578
-            sudo cat /etc/issue | grep -i ubuntu
-            if [ $? -eq 0 ]; then
-                sudo apt-get purge -y libvirt*
-                sudo rm -rf /var/lib/libvirt/
             fi
 
             sudo kill $(pgrep rabbitmq)
@@ -149,14 +172,25 @@
                 sudo pip uninstall $i -y;
             done
 
-            sudo apt-get install python-docutils python-pkg-resources -y 2>&1|tee
-            sudo yum install python-docutils python-pkg-resources -y 2>&1|tee
+            sudo kill -9 `pgrep ovsdb-server`
+            sudo kill -9 `pgrep ovs-vswitchd`
+
+            sudo rm -rf /usr/local/lib/python2.7/dist-packages/appdir*
+
+            cat /etc/issue|grep -i 'ubuntu'
+            if [ -z $? ]; then
+                sudo apt-get install python-docutils python-pkg-resources gnupg -y 2>&1|tee
+            else
+                sudo yum install python-docutils python-pkg-resources gnupg python-requests rabbitmq-server -y 2>&1|tee
+            fi
+            sudo pip install appdirs==1.4.3
+            sudo pip install setuptools
             sudo pip install pbr
             sudo pip install six
             sudo pip install jinja2
+            sudo pip install babel
             sudo pip install docutils
             sudo pip install oslo.privsep
-            sudo yum install python-requests rabbitmq-server -y
 
             [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
             if [[ -n $ZUUL_PROJECT ]]; then
@@ -199,6 +233,9 @@
 
             sudo rm -rf /opt/stack
             env
+            sudo journalctl --vacuum-time=0
+            sudo journalctl --vacuum-size=0
+            sudo systemctl restart systemd-journald
             echo "FINISHED:############## $phase  ###################"
 
 - builder:
@@ -210,9 +247,13 @@
             echo "STARTED: ############## $phase  ###################"
 
             echo "Delete all Bridges"
-            for br in `sudo ovs-vsctl list-br`; do
-                sudo ovs-vsctl del-br $br
-            done
+            br=$(sudo ovs-vsctl list-br)
+            if [ $br ]; then
+                for br in $(sudo ovs-vsctl list-br); do
+                    sudo ovs-vsctl del-br $br 2>&1|tee > /dev/null
+                done
+            fi
+            echo "Done"
 
 
 - builder:
@@ -223,9 +264,6 @@
             phase="APPLY-WORKAROUNDS-POST"
             echo "STARTED: ############## $phase  ###################"
 
-            for i in `ibdev2netdev | awk '{print $5}'`; do
-                sudo ifconfig $i up
-            done
             for port in `ibdev2netdev |grep _0 | grep Up |awk '{print $5}'`; do
                 if [ -z $port ]; then
                     echo "Error finding ipoib port"
@@ -238,6 +276,8 @@
 
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
+            #cd /opt/stack/tempest
+            #git pull git://git.openstack.org/openstack/tempest refs/changes/80/437880/1
 
 
 - builder:
@@ -309,6 +349,8 @@
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "One of the critical params not found"
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           cat > $WORKSPACE/devstack/local.conf  <<EOF
@@ -321,6 +363,8 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -354,8 +398,7 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth
-          disable_service h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           enable_service eswitchd
@@ -363,7 +406,7 @@
           enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
@@ -416,6 +459,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -431,13 +475,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -469,13 +515,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
@@ -517,6 +563,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -532,13 +579,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -570,13 +619,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-sriov-agt q-qos
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
@@ -615,6 +664,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -630,13 +680,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -668,13 +720,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
@@ -718,18 +770,17 @@
           SWIFT_HASH=password
           SWIFT_ENABLE_TEMPURLS=True
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           RECLONE=yes
-          USE_SCREEN=True
+          SCREEN=True
           # Logging
           LOGDIR=\${LOGDIR:-/opt/stack/logs}
           LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
 
-          #mlnx_port=\`ibdev2netdev |grep Up |awk '{print $5}'|tail -n1\`
-          #epioib_port=\`ibdev2netdev |grep Up |awk '{print $5}'|head -n1\`
           epioib_port=eth2
-          #mlnx_dev=\`lspci |grep Mell|head -n1|awk '{print $1}' |  sed s/\.0\$//g\`
 
           PHYSICAL_INTERFACE=$epioib_port
           PHYSICAL_NETWORK=default
@@ -737,7 +788,7 @@
           OVS_PHYSICAL_BRIDGE=br-$epioib_port
 
           disable_service n-net n-novnc horizon
-          disable_service heat h-api h-api-cfn h-api-cw h-eng
+          disable_service heat h-api h-api-cfn h-api-cw h-eng etcd3
           disable_service cinder c-sch c-api c-vol
           enable_service ironic ir-api ir-cond
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
@@ -859,6 +910,7 @@
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" |grep Up| awk '{print $5}'|head -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -870,7 +922,9 @@
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
-          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          HOST_IP=$(hostname -i)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -904,7 +958,7 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt
           enable_service eswitchd
@@ -912,7 +966,7 @@
           enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
@@ -966,6 +1020,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -981,13 +1036,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1020,13 +1077,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -1066,6 +1123,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -1081,13 +1139,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1119,13 +1179,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -1162,6 +1222,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" | grep Up|awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -1177,13 +1238,15 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=False
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1215,13 +1278,13 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
           disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-qos q-sriov-agt
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -1256,6 +1319,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| grep "port 1" | awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -1279,6 +1343,8 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1319,11 +1385,10 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-qos,q-sriov-agt
-          enable_service placement-api
+          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api,q-qos
           enable_plugin neutron $NEUTRON_REPO
-          disable_service tempest n-cauth
-          USE_SCREEN=True
+          disable_service tempest n-cauth c-vol etcd3
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -1354,6 +1419,7 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"|grep Up| awk '{print $5}'|tail -n1`
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
           if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
@@ -1371,7 +1437,7 @@
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
-          IMAGE_URLS="http://$IMAGE_SERVER/images/mellanox_eth.img,"
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
           MULTI_HOST=1
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
@@ -1381,6 +1447,8 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1412,10 +1480,10 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service horizon h-eng h-api h-api-cfn h-api-cw
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-qos q-sriov-agt tempest n-novnc n-xvnc n-cpu placement-api
+          disable_service horizon h-eng h-api h-api-cfn h-api-cw c-vol etcd3
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc n-cpu placement-api q-qos
           enable_plugin neutron $NEUTRON_REPO
-          USE_SCREEN=True
+          SCREEN=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -1455,7 +1523,9 @@
           echo "STARTED: ############## $phase  ###################"
           [ -d $WORKSPACE/mlnx-project-config ] && rm -rf $WORKSPACE/mlnx-project-config
 
-          git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
+          #git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
+          git clone https://github.com/Mellanox/mlnx-project-config.git $WORKSPACE/mlnx-project-config
+          #git clone git://git.openstack.org/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1480,6 +1550,9 @@
               echo "FINISHED with ERROR $rc: ############## $phase  ###################"
               exit $rc
           fi
+          . $WORKSPACE/devstack/openrc admin
+          nova-manage cell_v2 discover_hosts
+          nova hypervisor-list
           echo "############## Stack is up and running ###################"
           echo "FINISHED: ############## $phase  ###################"
           sleep 240
@@ -1492,14 +1565,18 @@
           #!/bin/bash -x
           phase="STOP-STACKSH"
           echo "STARTED: ############## $phase  ###################"
+          CI_ARTIFACTS=$(dirname ${LOGDIR})
+          #Collect running logs
+          local u=""
+          local name=""
+          for u in `sudo systemctl list-unit-files | grep devstack | awk '{print $1}'`; do
+              name=$(echo $u | sed 's/devstack@/screen-/' | sed 's/\.service//')
+              sudo journalctl -o short-precise --unit $u | sudo tee $CI_ARTIFACTS/logs/$name.txt > /dev/null
+          done
 
-          #For latest Ubuntu
-          #export FORCE=yes
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
              $WORKSPACE/devstack/unstack.sh 2>&1|tee
           fi
-          #sudo yum remove  openvswitch -y
-          #sudo apt-get remove openvswitch-switch -y
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1659,7 +1736,7 @@
             cd /opt/stack/tempest
             test_list=/tmp/tempst_list_$$
             testr init
-            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api.test_extensions.ExtensionsTest|neutron.tests.tempest.scenario.test_qos.QoSTest" > $test_list
+            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
             testr run --load-list=$test_list
             test_pass=$?
             rm -f $test_list
@@ -1787,6 +1864,10 @@
         - shell: |
             #!/bin/bash
             phase="RUN-TESTS-MULTINODE"
+            source $WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/devstack/openrc admin
+            nova-manage cell_v2 discover_hosts
+            nova hypervisor-list
+
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
             echo "STARTED: ############## $phase  ###################"
             tests=(
@@ -1939,6 +2020,8 @@
           echo "STARTED: ############## $phase  ###################"
           CI_ARTIFACTS=$(dirname ${LOGDIR})
           dmesg -T 2>&1|tee > $CI_ARTIFACTS/logs/dmesg.log
+          mysql -e"show status like 'Conn%';" > $CI_ARTIFACTS/logs/mysql_connections.txt
+
           echo "TGT Status"
           sudo service tgt status 2>&1 |tee
 
@@ -1960,6 +2043,7 @@
           sudo chown -R stack $CI_ARTIFACTS
 
           [ -d $WORKSPACE/mlnx-project-config ] && $WORKSPACE/mlnx-project-config/tools/analize.py $CI_ARTIFACTS/logs 2>&1|tee
+
           source=/tmp/ci-artifacts_$$
           rsync $CI_ARTIFACTS/* $source -a --copy-links -v 2>&1|tee > /dev/null
           rm -f $source/logs/*.log.* 2>&1|tee > /dev/null
@@ -2032,7 +2116,7 @@
 
           [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
 
-          git clone ssh://cloudx-17/images/openstack/devstack
+          git clone git://git.openstack.org/openstack-dev/devstack
           pushd $WORKSPACE/devstack
 
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
@@ -2118,12 +2202,15 @@
           export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
           export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
 
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
@@ -2139,7 +2226,7 @@
           SCREEN_LOGDIR=\$LOGDIR/screen
           LOGDAYS=2
 
-          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng n-cauth q-lbaas
+          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng n-cauth q-lbaas etcd3
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           disable_service n-novnc n-xvnc horizon
           enable_service tempest
@@ -2212,7 +2299,7 @@
     name: configure-devstack-Cinder-ISER-LIO
     builders:
       - shell: |
-          #!/bin/bash +e
+          #!/bin/bash +ex
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
@@ -2226,6 +2313,8 @@
           cat > devstack/local.conf <<EOF
           [[local|localrc]]
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
@@ -2244,7 +2333,7 @@
           SCREEN_LOGDIR=\$LOGDIR/screen
           LOGDAYS=2
 
-          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng q-lbaas n-cauth
+          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng q-lbaas n-cauth etcd3
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
           disable_service n-novnc n-xvnc horizon
           enable_service tempest
@@ -2337,8 +2426,8 @@
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest

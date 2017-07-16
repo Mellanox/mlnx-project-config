@@ -1,0 +1,373 @@
+- builder:
+    name: apply-workarounds-pre-stack-asap-vlan
+    builders:
+       - shell: |
+            #!/bin/bash -ex
+            phase="APPLY-WORKAROUNDS-PRE-VLAN"
+            echo "STARTED: ############## $phase  ###################"
+            echo "Configure ASAP VLAN"
+            pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
+            echo "Using pci=$pci pf=$pf"
+
+            sudo ovs-dpctl del-dp ovs-system 2>&1|tee
+            sudo modprobe -r openvswitch
+
+
+- builder:
+    name: install-missing-rpms
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            sudo yum install -y ethtool xterm.x86_64 xorg-x11-xauth.x86_64 xorg-x11-xinit.x86_64 xorg-x11-fonts-ISO8859-1-100dpi.noarch xorg-x11-font-utils.x86_64 tigervnc-server.x86_64 xorg-x11-fonts-Type1.noarch ghostscript.x86_64 tigervnc gnupg
+
+
+- builder:
+    name: asap-configure
+    builders:
+        - shell: |
+            #!/bin/bash -ex
+
+            # VLAN
+            pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+            echo "pci=$pci pf=$pf HCA=$HCA"
+            NUM_VFS=4
+
+            sudo sh -c "echo $NUM_VFS > /sys/class/net/${pf}/device/sriov_numvfs"
+
+            echo "Unbind devices"
+            i=1
+            while [ ! $i -gt $NUM_VFS ]; do
+                echo "unbinding 0000:${pci}.$i"
+                sudo sh -c "echo  0000:${pci}.$i > /sys/bus/pci/drivers/mlx5_core/unbind 2>&1|tee > /dev/null"
+                let i=i+1
+            done
+
+            echo "Configure ASAP"
+            sudo devlink dev eswitch set pci/0000:${pci}.0 mode switchdev
+            sudo ethtool -K $pf hw-tc-offload on
+
+            i=1
+            while [ ! $i -gt $NUM_VFS ]; do
+                echo "binding 0000:${pci}.$i"
+                sudo sh -c "echo  0000:${pci}.$i > /sys/bus/pci/drivers/mlx5_core/bind 2>&1|tee > /dev/null"
+                let i=i+1
+            done
+
+            lspci|grep Mell
+            ls -l /sys/class/net/
+
+
+- builder:
+    name: apply-workarounds-post-stack-asap-vlan
+    builders:
+        - shell: |
+            #!/bin/bash -xE
+            phase="APPLY-WORKAROUNDS-POST"
+            echo "STARTED: ############## $phase  ###################"
+            echo "Stop iptables and network manager services"
+            sudo systemctl stop iptables.service
+
+            cd /opt/stack/neutron
+            git fetch git://git.openstack.org/openstack/neutron refs/changes/16/275616/23 && git cherry-pick FETCH_HEAD
+            sudo systemctl restart devstack@q-svc.service
+
+
+- builder:
+    name: configure-devstack-OVS_HW_offload
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK-Multinode-Controller"
+          echo "STARTED: ############## $phase  ###################"
+
+          export pci=$(lspci |grep Mell|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          echo "pci=$pci, pf=$pf"
+          if [ "$ZUUL_CHANGE" -eq "480213" ];then
+              export OS_VIF_BRANCH=${OS_VIF_BRANCH:-refs/changes/13/480213/3}
+          else
+              export OVS_BRANCH="refs/changes/13/480213/"$ZUUL_PATCHSET
+          fi
+
+          cat > $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
+          MULTI_HOST=1
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          LIBS_FROM_GIT=python-neutronclient
+          SERVICE_TOKEN=servicetoken
+          IDENTITY_API_VERSION=3
+          HOST_IP=$(hostname -i)
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+
+          NEUTRON_BRANCH=$NEUTRON_BRANCH
+          NOVA_BRANCH=$NOVA_BRANCH
+          OS_VIF_BRANCH=$OS_VIF_BRANCH
+          LIBS_FROM_GIT=os-vif,neutron-lib
+          NEUTRON_LIB_BRANCH=$NEUTRON_LIB_BRANCH
+          OVS_BRANCH=$OVS_BRANCH
+          Q_BUILD_OVS_FROM_GIT=True
+
+          PUBLIC_INTERFACE=$pf
+          # Logging
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          LOG_COLOR=False
+          RECLONE=yes
+          # Cinder
+          VOLUME_BACKING_FILE_SIZE=1000M
+          # Keystone
+          SERVICE_TOKEN=servicetoken
+          # Neutron
+          Q_PLUGIN=ml2
+          Q_AGENT=openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
+          Q_USE_DEBUG_COMMAND=False
+          Q_USE_SECGROUP=True
+          ENABLE_TENANT_VLANS=True
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          PHYSICAL_NETWORK=default
+          PHYSICAL_INTERFACE=$pf
+          TENANT_VLAN_RANGE=2:100
+          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          OVS_PHYSICAL_BRIDGE=br-$pf
+          ALLOW_NEUTRON_DB_MIGRATIONS=true
+          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          # Services
+          disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-novnc n-xvnc n-cpu placement-api tempest
+
+          enable_plugin neutron https://github.com/openstack/neutron
+          enable_plugin os-vif https://github.com/openstack/os-vif
+
+          USE_SCREEN=False
+          SYSLOG=True
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+          [pci]
+          passthrough_whitelist ={"'"address"'":"'"*:'"$pci"'.*"'","'"physical_network"'":"'"default"'"}
+          [filter_scheduler]
+          enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,DiskFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+          [[test-config|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=direct
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network
+          [compute-feature-enabled]
+          suspend=false
+          resize=false
+          EOF
+
+          echo "FINISHED: ############## $phase  ###################"
+
+- project:
+    name: VLAN-ASAP-Configure
+    node: ASAP
+    jobs:
+      - 'VLAN-ASAP-Configure'
+
+- project:
+    name: ASAP-Update-kernel
+    node: ASAP
+    jobs:
+      - 'ASAP-Update-kernel'
+
+
+- job-template:
+    name: 'VLAN-ASAP-Configure'
+    node: '{node}'
+    concurrent: true
+    parameters:
+    builders:
+       - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
+            HCA=MT27800
+            PATH=$PATH:/usr/sbin
+            RELEASE=latest
+       - asap-configure
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+
+
+- project:
+    name: 'OVS_HW_offload'
+    node: ASAP
+    jobs:
+      - 'OVS_HW_offload'
+
+- job-template:
+    name: 'OVS_HW_offload'
+    node: '{node}'
+    concurrent: false
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=52.169.200.208
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            IMAGE_SERVER=52.169.200.208
+            HCA=MT27800
+            PATH=$PATH:/usr/sbin
+            NEUTRON_BRANCH=refs/changes/90/481890/2
+            #NEUTRON_BRANCH=refs/changes/16/275616/23
+            NEUTRON_LIB_BRANCH=refs/changes/30/452530/4
+            NOVA_BRANCH=refs/changes/65/398265/16
+            OVS_BRANCH="master"
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack-asap-vlan
+      - configure-devstack-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack-asap-vlan
+      - run-tests-network-asap
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - upload-console-log-mn #This line must be the last one
+
+- job-template:
+    name: 'ASAP-Update-kernel'
+    node: '{node}'
+    concurrent: true
+    parameters:
+    builders:
+       - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
+            HCA=MT27800
+            PATH=$PATH:/usr/sbin
+            RELEASE_DIR=/jenkins/ASAP
+            RELEASE=ASAP2_DIRECT-3.0-rc29
+       - asap-update-kernel
+       - install-missing-rpms
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+
+- builder:
+    name: asap-update-kernel
+    builders:
+        - shell: |
+            #!/bin/bash -xe
+
+            if [ ! -e "$RELEASE_DIR/$RELEASE" ]; then
+                echo "Cannot find release $RELEASE_DIR/$RELEASE"
+                exit 1
+            fi
+
+            echo "Release: $RELEASE"
+            KERNEL=`ls -1 $RELEASE_DIR/$RELEASE/RPMS/kernel-[0-9].*.x86_64.rpm`
+            KERNEL_HEADERS=`ls -1 $RELEASE_DIR/$RELEASE/RPMS/kernel-headers-[0-9].*.x86_64.rpm`
+            echo "Kernel $KERNEL"
+            echo "Kernel headers $KERNEL_HEADERS"
+
+            if [ "$KERNEL" == "" ]; then
+                    echo "Cannot find kernel"
+                    exit 1
+            fi
+
+            sleep 3
+
+            pushd $RELEASE_DIR/$RELEASE/RPMS/
+            #sudo rpm -Uvh --force $(ls |egrep -v "doc|src|debug|test"|egrep "rpm$")
+            sudo rpm -Uvh --force $(ls |egrep "kernel|iproute" |egrep -v "devel|src|debug|doc")
+            popd
+
+            vmlinuz=`rpm -qlp $KERNEL | grep -m1 ^/boot/vmlinuz-`
+            initramfs=/boot/initramfs-${vmlinuz:14}.img
+
+            echo "vmlinuz $vmlinuz"
+            echo "initramfs $initramfs"
+
+            if [ ! -f $vmlinuz ]; then
+                echo "Cannot find $vmlinuz"
+                exit 1
+            fi
+
+            if [ ! -f $initramfs ]; then
+                echo "Cannot find $initramfs"
+                exit 1
+            fi
+
+            vmlinuz=${vmlinuz:6}
+            initramfs=${initramfs:6}
+
+            vmlinuz=$(echo $vmlinuz |cut -d'/' -f3)
+            initramfs=$(echo $initramfs |cut -d'/' -f3)
+
+            grub_file="/boot/grub/grub.conf"
+
+            export default=$(cat /boot/grub/grub.conf|grep title|wc -l)
+
+            sudo sh -c "echo '' >> $grub_file"
+            sudo sh -c "echo \"title Fedora OVS $vmlinuz\" >> $grub_file"
+            sudo sh -c "echo \"root (hd0,0)\" >> $grub_file"
+            sudo sh -c "echo \"kernel /$vmlinuz root=/dev/sda2 console=tty0 console=ttyS0,115200n8 rhgb intel_iommu=on\" >> $grub_file"
+            sudo sh -c "echo \"initrd /$initramfs\" >> $grub_file"
+
+            sudo sed -i s"/default [0-9]/default $default/g" $grub_file
+            sudo cat $grub_file
+
+            echo "Rebooting"
+            cat > /tmp/reboot.sh <<EOF
+            sleep 20
+            sudo shutdown -r now
+            EOF
+            sudo timedatectl set-timezone 'Asia/Jerusalem'
+            sleep 120
+            BUILD_ID=dontKillMe nohup bash /tmp/reboot.sh &
+            exit 0
+
+- builder:
+    name: run-tests-network-asap
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-NETWORK-ADVANCED"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(
+                tempest.scenario.test_network_advanced_server_ops
+                tempest.scenario.test_network_basic_ops
+            )
+            pushd /opt/stack/tempest
+            testr list-tests ${tests[@]}
+            testr init
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            virt/bin/pip install -U -r requirements.txt
+            testr run ${tests[@]}
+            test_pass=$?
+            deactivate
+
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+

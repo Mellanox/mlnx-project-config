@@ -1,0 +1,72 @@
+- project:
+    name: BACKUP-CI
+    node: master
+    jobs:
+      - 'BACKUP-CI'
+
+- job-template:
+    name: 'BACKUP-CI'
+    node: '{node}'
+    triggers:
+      - timed: '@weekly'
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=/jenkins/workspace/BACKUP-CI/ci-artifacts/logs
+            MAX_LOG_DAYS=60
+      - backup-ci
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - email-ext:
+          recipients: lioros@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+
+
+- builder:
+    name: backup-ci
+    builders:
+         - shell: |
+            #!/bin/bash -x
+
+            timestamp=$(date +%Y%m%d_%H%M)
+            dest="$LOGDIR/BACKUP/$timestamp"
+
+            sudo mkdir -p $dest/etc/
+            sudo cp -ra /etc/nodepool $dest/etc
+
+            mkdir -p $dest/etc/default
+            sudo cp -ra /etc/default/nodepool $dest/etc/default/
+
+            for user in jenkins nodepool; do
+                mkdir -p $dest/$user
+                sudo chown -R $user:$user $dest/$user
+                sudo cp -ra /home/$user/.ssh $dest/$user/
+            done
+
+            mkdir -p $dest/var/lib/jenkins
+            sudo chown jenkins:jenkins  $dest/var/lib/jenkins
+            sudo -u jenkins cp -ra /var/lib/jenkins/.ssh/*  $dest/var/lib/jenkins
+
+            mkdir $dest/etc/zuul
+            sudo cp -ra /etc/zuul/* $dest/etc/zuul
+
+            mkdir -p $dest/var/lib/zuul/ssh
+            sudo cp -ra /var/lib/zuul/ssh/id_rsa $dest/var/lib/zuul/ssh
+
+            mkdir $dest/etc/puppet
+            sudo cp -ra /etc/puppet/environments/common.yaml $dest/etc/puppet
+
+            sudo cp -ra /etc/jenkins_jobs $dest/etc/
+
+            sudo chmod 777 -R $dest
+            gzip -9 -r $dest 2>&1|tee > /dev/null
+
+            echo "Saved in http://dev-r-vrt-219-013:81/BACKUP/$timestamp"

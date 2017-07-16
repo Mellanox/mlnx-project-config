@@ -1,0 +1,60 @@
+- project:
+    name: QOS-Rate-Limit
+    node: ETH_CX34
+    jobs:
+      - 'QOS-Rate-Limit'
+
+- job-template:
+    name: 'QOS-Rate-Limit'
+    node: '{node}'
+    concurrent: true
+    parameters:
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            HCA=MT27800
+            PATH=$PATH:/usr/sbin
+            EXT_SERVER=52.169.200.208
+            LOGSERVER=cloudx@$EXT_SERVER
+            PATH=$PATH:/usr/sbin
+            CINDER_REPO=git://git.openstack.org/openstack/cinder
+            GLANCE_REPO=git://git.openstack.org/openstack/glance
+            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
+            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
+            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
+            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-Neutron-ML2-Sriov
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - configure-qos-rate-limit
+      - run-tests-qos-rate-limit
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+
+
+- builder:
+    name: run-tests-qos-rate-limit
+    builders:
+        - shell: |
+            #!/bin/bash
+
+
+- builder:
+    name: configure-qos-rate-limit
+    builders:
+        - shell: |
+            #!/bin/bash
+
+
