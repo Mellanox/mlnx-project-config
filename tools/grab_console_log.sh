@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash -x
 
 RETRY_LIMIT=300
 log_dir=/tmp/$$
@@ -21,7 +21,7 @@ while ! egrep -q "Finished: " $log_file; do
     if [ $TRIES -gt $RETRY_LIMIT ]; then
         break
     fi
-    sleep 3
+    sleep 5
     # -X POST because Jenkins doesn't do partial gets properly when
     #         job is running.
     # --data start=X instructs Jenkins to mimic a partial get using
