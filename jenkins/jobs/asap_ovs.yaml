@@ -69,10 +69,6 @@
             echo "Stop iptables and network manager services"
             sudo systemctl stop iptables.service
 
-            cd /opt/stack/neutron
-            git fetch git://git.openstack.org/openstack/neutron refs/changes/16/275616/23 && git cherry-pick FETCH_HEAD
-            sudo systemctl restart devstack@q-svc.service
-
 
 - builder:
     name: configure-devstack-OVS_HW_offload
@@ -85,17 +81,11 @@
           export pci=$(lspci |grep Mell|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
           export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
           echo "pci=$pci, pf=$pf"
-          if [ "$ZUUL_CHANGE" -eq "480213" ];then
-              export OS_VIF_BRANCH=${OS_VIF_BRANCH:-refs/changes/13/480213/3}
-          else
-              export OVS_BRANCH="refs/changes/13/480213/"$ZUUL_PATCHSET
-          fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
           IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
-          MULTI_HOST=1
           ADMIN_PASSWORD=password
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
@@ -107,11 +97,7 @@
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
 
           NEUTRON_BRANCH=$NEUTRON_BRANCH
-          NOVA_BRANCH=$NOVA_BRANCH
-          OS_VIF_BRANCH=$OS_VIF_BRANCH
           LIBS_FROM_GIT=os-vif,neutron-lib
-          NEUTRON_LIB_BRANCH=$NEUTRON_LIB_BRANCH
-          OVS_BRANCH=$OVS_BRANCH
           Q_BUILD_OVS_FROM_GIT=True
 
           PUBLIC_INTERFACE=$pf
@@ -177,7 +163,7 @@
 
 - project:
     name: ASAP-Update-kernel
-    node: ASAP
+    node: OVS_HW_offload
     jobs:
       - 'ASAP-Update-kernel'
 
@@ -205,7 +191,7 @@
 
 - project:
     name: 'OVS_HW_offload'
-    node: ASAP
+    node: OVS_HW_offload
     jobs:
       - 'OVS_HW_offload'
 
@@ -223,11 +209,8 @@
             IMAGE_SERVER=52.169.200.208
             HCA=MT27800
             PATH=$PATH:/usr/sbin
-            NEUTRON_BRANCH=refs/changes/90/481890/2
-            #NEUTRON_BRANCH=refs/changes/16/275616/23
-            NEUTRON_LIB_BRANCH=refs/changes/30/452530/4
-            NOVA_BRANCH=refs/changes/65/398265/16
-            OVS_BRANCH="master"
+            NEUTRON_BRANCH=refs/changes/90/481890/3
+            #OVS_BRANCH="master"
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -293,7 +276,6 @@
             sleep 3
 
             pushd $RELEASE_DIR/$RELEASE/RPMS/
-            #sudo rpm -Uvh --force $(ls |egrep -v "doc|src|debug|test"|egrep "rpm$")
             sudo rpm -Uvh --force $(ls |egrep "kernel|iproute" |egrep -v "devel|src|debug|doc")
             popd
 
@@ -369,5 +351,3 @@
             fi
             popd
             echo "FINISHED: ############## $phase  ###################"
-
-
