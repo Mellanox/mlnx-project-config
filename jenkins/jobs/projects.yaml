@@ -13,13 +13,6 @@
       - 'Neutron-ML2-Sriov'
 
 - project:
-    name: Neutron-ML2-Sriov-CX5
-    github-org: openstack-dev
-    node: ETH_CX35
-    jobs:
-      - 'Neutron-ML2-Sriov-CX5'
-
-- project:
     name: Neutron-Networking-MLNX-ML2
     github-org: openstack-dev
     node: SRIOV_IB
@@ -33,19 +26,6 @@
     jobs:
         - 'Nova-ML2-Sriov'
 
-- project:
-    name: Nova-ML2-Sriov-Mitaka
-    github-org: openstack-dev
-    node: ETH_CX34_MITAKA
-    jobs:
-        - 'Nova-ML2-Sriov-Mitaka'
-
-- project:
-    name: Nova-ML2-Sriov-Test
-    github-org: openstack-dev
-    node: ETH_CX34_TEST
-    jobs:
-        - 'Nova-ML2-Sriov-Test'
 
 - project:
     name: Nova-MACVTAP-ML2-Sriov
@@ -64,16 +44,9 @@
         - 'Neutron-MACVTAP-ML2-Sriov'
 
 - project:
-    name: Ironic-IB
-    github-org: openstack-dev
-    node: IRONIC_IB
-    jobs:
-        - 'Ironic-IB'
-
-- project:
     name: NOOP
     github-org: openstack-dev
-    node: ETH_CX34
+    node: daily
     jobs:
         - 'NOOP'
 

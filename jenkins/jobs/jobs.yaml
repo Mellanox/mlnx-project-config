@@ -14,7 +14,7 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
+            #REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             FORCE=yes
@@ -49,103 +49,6 @@
           body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - upload-console-log #This line must be the last one
 
-- job-template:
-    name: 'Nova-ML2-Sriov-Mitaka'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=52.169.200.208
-            PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
-            ZUUL_BRANCH=stable/mitaka
-            FORCE=yes
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-Nova-ML2-Sriov
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: lennyb@mellanox.com
-          subject: Failed Mellanox CI {name}
-          failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
-      - upload-console-log #This line must be the last one
-
-
-- job-template:
-    name: 'Nova-ML2-Sriov-Test'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
-            IMAGE_SERVER=52.169.200.208
-            PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
-            FORCE=yes
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-Nova-ML2-Sriov
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
-      #- 'run-tests-{name}-API'
-      - add-mac-nova # workaround to add mac to the bridge
-      - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
-      - run-tests-network-advanced
-      - delete-mac-nova # remove macs
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: lennyb@mellanox.com
-          subject: Failed Mellanox CI {name}
-          failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
-      - upload-console-log #This line must be the last one
 
 
 
@@ -165,7 +68,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             FORCE=yes
@@ -216,7 +118,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
             FORCE=yes
@@ -266,7 +167,6 @@
             CINDER_REPO=git://git.openstack.org/openstack/cinder
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -311,7 +211,6 @@
             CINDER_REPO=git://git.openstack.org/openstack/cinder
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -363,7 +262,6 @@
             CINDER_REPO=git://git.openstack.org/openstack/cinder
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -402,57 +300,6 @@
           body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - upload-console-log  #This line must be the last one
 
-- job-template:
-    name: 'Neutron-ML2-Sriov-CX5'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
-            IMAGE_SERVER=52.169.200.208
-            PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
-            FORCE=yes
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-#      - delete-mac-nova # remove macs
-      - 'run-tests-{name}-API'
-#      - add-mac-nova # workaround to add mac to the bridge
-#      - delete-mac-nova # remove macs
-#      - add-mac-nova # workaround to add mac to the bridge
-      - run-tests-network-advanced
-      - run-tests-network-basic
-#      - delete-mac-nova # remove macs
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: lennyb@mellanox.com
-          subject: Failed Mellanox CI {name}
-          failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
-      - upload-console-log  #This line must be the last one
-
 
 - job-template:
     name: 'Neutron-Networking-MLNX-ML2'
@@ -470,7 +317,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -484,55 +330,6 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - 'run-tests-{name}'
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: lennyb@mellanox.com
-          subject: Failed Mellanox CI {name}
-          failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
-      - upload-console-log  #This line must be the last one
-
-
-- job-template:
-    name: 'Ironic-IB'
-    node: '{node}'
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
-            IMAGE_SERVER=52.169.200.208
-            PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
-            FORCE=yes
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-      #- apply-workarounds-post-stack-{name}
-      #- 'run-tests-{name}-API'
-      #- 'run-tests-{name}-configure-Real-BM'
-      #- 'run-tests-{name}-run-Real-BM'
       - produce-readme-file
     properties:
       - build-discarder:
@@ -565,7 +362,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -605,7 +401,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -653,7 +448,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -702,7 +496,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -787,7 +580,6 @@
             GLANCE_REPO=git://git.openstack.org/openstack/glance
             NEUTRON_REPO=git://git.openstack.org/openstack/neutron
             KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
             TEMPEST_REPO=git://git.openstack.org/openstack/tempest
             HORIZON_REPO=git://git.openstack.org/openstack/horizon
             NOVA_REPO=git://git.openstack.org/openstack/nova
@@ -819,74 +611,13 @@
           timeout: 320
           fail: true
 
-- job:
-    name: Mellanox-CI-StableNewton-Test
-    project-type: multijob
-    node:  master
-#    triggers:
-#      - timed: 'H 0 * * *'
-    builders:
-      - multijob:
-           name: Mellanox-CI-Daily-StableNewton-Status
-           condition: ALWAYS
-           projects:
-#              - name: Nova-ML2-Sriov
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Nova-MACVTAP-ML2-Sriov
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Tempest-Sriov
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Neutron-ML2-Sriov
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Neutron-ML2-MLNX
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Neutron-Networking-MLNX-ML2
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-#              - name: Cinder-ISER-LIO
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/newton
-#                   FORCE=yes
-              - name: Cinder-ISER-ISCSI
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   FORCE=yes
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    wrappers:
-      - timeout:
-          timeout: 500
-
 
 - job:
     name: Mellanox-CI-Daily-StableNewton-Status
     project-type: multijob
-    node:  master
-#    triggers:
-#      - timed: 'H 0 * * *'
+    node: daily
+    triggers:
+      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Mellanox-CI-Daily-StableNewton-Status
@@ -897,41 +628,48 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
                    FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
+                   NOVA_BRANCH=refs/changes/05/490405/1
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
                    FORCE=yes
               - name: Tempest-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
                    FORCE=yes
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
                    FORCE=yes
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
                    FORCE=yes
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/newton
+                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
                    FORCE=yes
-              - name: Cinder-ISER-LIO
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   FORCE=yes
-              - name: Cinder-ISER-ISCSI
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   FORCE=yes
+              #- name: Cinder-ISER-LIO
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/newton
+              #     FORCE=yes
+              #- name: Cinder-ISER-ISCSI
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/newton
+              #     FORCE=yes
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -942,73 +680,13 @@
       - timeout:
           timeout: 500
 
-- job:
-    name: Mellanox-CI-Daily-StableMitaka-Status
-    project-type: multijob
-    node:  master
-#    triggers:
-#      - timed: 'H 0 * * *'
-    builders:
-      - multijob:
-           name: Mellanox-CI-Daily-StableMitaka-Status
-           condition: ALWAYS
-           projects:
-              - name: Nova-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-              - name: Nova-MACVTAP-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-              - name: Tempest-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-              - name: Neutron-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-              - name: Neutron-ML2-MLNX
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-              - name: Neutron-Networking-MLNX-ML2
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/mitaka
-                   FORCE=yes
-#              - name: Cinder-ISER-LIO
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/mitaka
-#                   FORCE=yes
-#              - name: Cinder-ISER-ISCSI
-#                current-parameters: true
-#                predefined-parameters: |
-#                   ZUUL_BRANCH=stable/mitaka
-#                   FORCE=yes
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    wrappers:
-      - timeout:
-          timeout: 500
 
 - job:
     name: Mellanox-CI-Daily-StableOcata-Status
     project-type: multijob
-    node:  master
-#    triggers:
-#      - timed: 'H 0 * * *'
+    node:  daily
+    triggers:
+      - timed: 'H 0 * * *'
     builders:
       - multijob:
            name: Mellanox-CI-Daily-StableOcata-Status
@@ -1019,10 +697,16 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
+              #- name: Nova-ML2-Sriov-Multinode
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/ocata
+              #     FORCE=yes
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
+                   NOVA_BRANCH=refs/changes/04/490404/1
                    FORCE=yes
               - name: Tempest-Sriov
                 current-parameters: true
@@ -1044,16 +728,16 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
-              - name: Cinder-ISER-LIO
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/ocata
-                   FORCE=yes
-              - name: Cinder-ISER-ISCSI
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/ocata
-                   FORCE=yes
+              #- name: Cinder-ISER-LIO
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/ocata
+              #     FORCE=yes
+              #- name: Cinder-ISER-ISCSI
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/ocata
+              #    FORCE=yes
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -1068,7 +752,7 @@
 - job:
     name: Mellanox-CI-Daily-Master-Status
     project-type: multijob
-    node:  master
+    node:  daily
     triggers:
       - timed: 'H 0 * * *'
     builders:
@@ -1080,8 +764,8 @@
                 current-parameters: true
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
-              - name: Nova-ML2-Sriov-Multinode
-                current-parameters: true
+              #- name: Nova-ML2-Sriov-Multinode
+              #  current-parameters: true
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
@@ -1091,6 +775,8 @@
 #              - name: Cinder-ISER-LIO
 #                current-parameters: true
 #              - name: Cinder-ISER-ISCSI
+#                current-parameters: true
+#              - name: NVMe
 #                current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true

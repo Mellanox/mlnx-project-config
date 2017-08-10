@@ -1,12 +1,14 @@
 - builder:
     name: upload-console-log
     builders:
+      - collect-devstack-syslog
       - collect-config-files
       - stop-stacksh
       - collect-artifacts
       - shell: |
-          #!/bin/bash
-          BUILD_ID=dontKillMe nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
+          #!/bin/bash -ex
+          #nohup /jenkins/grab_console_log.sh > /dev/null &
+          nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
 
 - publisher:
     name: upload-console-log
@@ -25,11 +27,17 @@
     publishers:
       - postbuildscript:
           builders:
+              - collect-devstack-syslog
               - collect-config-files
               - collect-artifacts
               - shell: |
-                  #!/bin/bash
-                  BUILD_ID=dontKillMe nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
+                  #!/bin/bash -ex
+                  #env > $WORKSPACE/grub_console.log
+                  #cat $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh >> $WORKSPACE/grub_console.log
+                  #cat /jenkins/workspace/grab_console_log.sh >> $WORKSPACE/grub_console.log
+                  #export NODE_TYPE=$NODE_TYPE
+                  #nohup /jenkins/workspace/grab_console_log.sh > /dev/null &
+                  nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
               # These flags really mean only if on * when
               # checked. When both set to false the post script
               # should run on every job regardless of status.
