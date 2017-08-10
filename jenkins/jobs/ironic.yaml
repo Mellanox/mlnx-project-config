@@ -145,7 +145,7 @@
           IRONIC_INSPECTOR_MANAGE_FIREWALL=False
           IRONIC_VM_SSH_PORT=22
 
-          SCREEN_LOGDIR=/opt/stack/logs/screen
+          SCREEN_LOGDIR=\$LOGDIR/screen
           TEMPEST_ALLOW_TENANT_ISOLATION=False
 
           [[post-config||/etc/ironic-inspector/inspector.conf]]

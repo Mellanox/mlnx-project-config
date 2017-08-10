@@ -167,7 +167,7 @@
             # Neutron
             Q_PLUGIN=ml2
             Q_AGENT=openvswitch
-            Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+            Q_ML2_PLUGIN_MECHANISM_DRIVERS=sriovnicswitch,openvswitch
             Q_USE_DEBUG_COMMAND=False
             Q_USE_SECGROUP=True
             ENABLE_TENANT_VLANS=True
@@ -188,7 +188,6 @@
             enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
             # Optional, to enable tempest configuration as part of devstack
             enable_service tempest
-            SCREEN=True
             [[post-config|\$NOVA_CONF]]
             [DEFAULT]
             [pci]
