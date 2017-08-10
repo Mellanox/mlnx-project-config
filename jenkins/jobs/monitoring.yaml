@@ -14,8 +14,12 @@
           properties-content: |
             LOGDIR=/jenkins/workspace/BACKUP-CI/ci-artifacts/logs
             MAX_LOG_DAYS=60
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=52.169.200.208
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=mlx5
+            PATH=$PATH:/usr/sbin
       - backup-ci
-      - produce-readme-file
     properties:
       - build-discarder:
           days-to-keep: 60
@@ -38,35 +42,48 @@
 
             timestamp=$(date +%Y%m%d_%H%M)
             dest="$LOGDIR/BACKUP/$timestamp"
+            sudo chown -R stack $CI_ARTIFACTS
 
             sudo mkdir -p $dest/etc/
             sudo cp -ra /etc/nodepool $dest/etc
 
-            mkdir -p $dest/etc/default
+            sudo mkdir -p $dest/etc/default
             sudo cp -ra /etc/default/nodepool $dest/etc/default/
 
             for user in jenkins nodepool; do
-                mkdir -p $dest/$user
+                sudo mkdir -p $dest/$user
                 sudo chown -R $user:$user $dest/$user
                 sudo cp -ra /home/$user/.ssh $dest/$user/
             done
 
-            mkdir -p $dest/var/lib/jenkins
+            sudo mkdir -p $dest/var/lib/jenkins
             sudo chown jenkins:jenkins  $dest/var/lib/jenkins
             sudo -u jenkins cp -ra /var/lib/jenkins/.ssh/*  $dest/var/lib/jenkins
 
-            mkdir $dest/etc/zuul
+            sudo mkdir $dest/etc/zuul
             sudo cp -ra /etc/zuul/* $dest/etc/zuul
 
-            mkdir -p $dest/var/lib/zuul/ssh
+            sudo mkdir -p $dest/var/lib/zuul/ssh
             sudo cp -ra /var/lib/zuul/ssh/id_rsa $dest/var/lib/zuul/ssh
 
-            mkdir $dest/etc/puppet
+            sudo mkdir $dest/etc/puppet
             sudo cp -ra /etc/puppet/environments/common.yaml $dest/etc/puppet
 
             sudo cp -ra /etc/jenkins_jobs $dest/etc/
 
-            sudo chmod 777 -R $dest
+            sudo chown -R stack $dest
+            sudo chown -R stack $CI_ARTIFACTS
+
             gzip -9 -r $dest 2>&1|tee > /dev/null
 
-            echo "Saved in http://dev-r-vrt-219-013:81/BACKUP/$timestamp"
+            UPLOAD_LOGPATH=/BACKUP/$timestamp
+
+            target=/var/www/html/${UPLOAD_LOGPATH}
+
+            ssh $LOGSERVER mkdir -p ${target}
+
+            scp -r $dest/* $LOGSERVER:$target 2>&1 | tee > /dev/null
+            # Copy tempest results
+
+            ip=$(echo $LOGSERVER | cut -d'@' -f2)
+            echo "Detailed logs: http://$ip/$UPLOAD_LOGPATH"
