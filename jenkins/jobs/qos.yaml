@@ -1,6 +1,6 @@
 - project:
     name: QOS-Rate-Limit
-    node: ETH_CX34
+    node: ETH_CX34_QOS
     jobs:
       - 'QOS-Rate-Limit'
 
@@ -13,10 +13,12 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            HCA=MT27800
+            HCA=MT27710
+            RX_RATE_LIMIT=10
             PATH=$PATH:/usr/sbin
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
             CINDER_REPO=git://git.openstack.org/openstack/cinder
             GLANCE_REPO=git://git.openstack.org/openstack/glance
@@ -30,11 +32,12 @@
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-Neutron-ML2-Sriov
+      - configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - configure-qos-rate-limit
       - run-tests-qos-rate-limit
+      - run-tests-neutron-qos
       - produce-readme-file
     properties:
       - build-discarder:
@@ -42,13 +45,13 @@
           num-to-keep: 200
           artifact-days-to-keep: 60
           artifact-num-to-keep: 200
-
-
-- builder:
-    name: run-tests-qos-rate-limit
-    builders:
-        - shell: |
-            #!/bin/bash
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log #This line must be the last one
 
 
 - builder:
@@ -56,5 +59,153 @@
     builders:
         - shell: |
             #!/bin/bash
+            pushd $WORKSPACE/devstack
+            rate_limit=$(expr $RX_RATE_LIMIT \* 1000)
+            . openrc admin
+            neutron qos-policy-create rate_limit
+            neutron qos-bandwidth-limit-rule-create --max-kbps $rate_limit rate_limit
 
 
+- builder:
+    name: run-tests-qos-rate-limit
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            pushd $WORKSPACE/devstack
+            status=0
+            . openrc admin
+             neutron port-create --binding:vnic_type=direct --qos-policy=rate_limit private
+            port_id=$(neutron port-create --binding:vnic_type=direct --qos-policy=rate_limit private | grep ' id   '|awk '{print $4}')
+            glance_image=$(openstack image list|grep active|awk '{print $2}')
+            nova boot --flavor m1.small --image $glance_image --nic port-id=$port_id vm_rate_limit
+            sleep 120
+            nova list
+            pf=`ibdev2netdev| grep ${HCA}_0| grep Up| awk '{print $5}'| tail -n1`
+            actual_rate=$(ip link show $pf | grep MAC| grep -v '00:00:00:00'|grep max_tx_rate|awk '{print $9}')
+            echo "Actual rate limit = $actual_rate Mb"
+            echo "Theoretical rate limit = $RX_RATE_LIMIT Mb"
+            if [ $RX_RATE_LIMIT -ne $actual_rate ]; then
+                echo "ERROR. rate limit did not set correctly"
+                neutron qos-bandwidth-limit-rule-show $(neutron qos-bandwidth-limit-rule-list rate_limit | grep egress|awk '{print $4}') rate_limit
+                ip link show $pf
+                status=1
+            fi
+            exit $status
+
+- builder:
+    name: run-tests-neutron-qos
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="RUN-TESTS-Neutron"
+            echo "STARTED: ############## $phase  ###################"
+            cd /opt/stack/tempest
+            test_list=/tmp/tempst_list_$$
+            testr init
+            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
+            #testr run --load-list=$test_list
+            testr run neutron.tests.tempest.scenario.test_qos
+            test_pass=$?
+            rm -f $test_list
+
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-QOS-Rate-Limit
+    builders:
+        - shell: |
+            #!/bin/bash -ex
+            phase="configure-devstack-QOS-Rate-Limit"
+            echo "STARTED: ############## $phase  ###################"
+
+            hca=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
+            HCA=${HCA:-hca}
+
+            export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
+            echo "Using pci=$pci pf=$pf HCA=$HCA"
+
+            #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
+            #    export EXTENSION="extensions=fdb
+            #[FDB]
+            #shared_physical_device_mappings=default:${pf}"
+            #    export PCI_WHITE_LIST="[pci]
+            #"
+            #else
+            #    export PCI_WHITE_LIST="pci_"
+            #fi
+
+            cat > $WORKSPACE/devstack/local.conf <<EOF
+            [[local|localrc]]
+            DOWNLOAD_DEFAULT_IMAGES=False
+            IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
+            MULTI_HOST=False
+            ADMIN_PASSWORD=password
+            MYSQL_PASSWORD=password
+            RABBIT_PASSWORD=password
+            SERVICE_PASSWORD=password
+            HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+            SYSLOG=False
+            USE_SCREEN=True
+            SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+            pci=$pci
+            pf=$pf
+            PUBLIC_INTERFACE=$pf
+            # Logging
+            LOGDIR=\${LOGDIR:-/opt/stack/logs}
+            LOGFILE=\$LOGDIR/stack.sh.log
+            LOG_COLOR=False
+            RECLONE=yes
+            # Cinder
+            VOLUME_BACKING_FILE_SIZE=1000M
+            # Keystone
+            SERVICE_TOKEN=servicetoken
+            # Neutron
+            Q_PLUGIN=ml2
+            Q_AGENT=openvswitch
+            Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch,sriovnicswitch
+            Q_USE_DEBUG_COMMAND=False
+            Q_USE_SECGROUP=True
+            ENABLE_TENANT_VLANS=True
+            Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+            ENABLE_TENANT_TUNNELS=False
+            Q_ML2_TENANT_NETWORK_TYPE=vlan
+            PHYSICAL_NETWORK=default
+            PHYSICAL_INTERFACE=${pf}
+            TENANT_VLAN_RANGE=2:100
+            NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+            OVS_PHYSICAL_BRIDGE=br-$pf
+            ALLOW_NEUTRON_DB_MIGRATIONS=true
+            Q_USE_PROVIDERNET_FOR_PUBLIC=False
+            # Services
+            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
+            enable_service n-xvnc n-novnc horizon
+            enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+            enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+            # Optional, to enable tempest configuration as part of devstack
+            enable_service tempest
+            SCREEN=True
+            [[post-config|\$NOVA_CONF]]
+            [DEFAULT]
+            [pci]
+            passthrough_whitelist ={"'"address"'":"'"*:'"${pci}"'.*"'","'"physical_network"'":"'"default"'"}
+            [filter_scheduler]
+            enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,DiskFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+            [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+            [ml2_sriov]
+            agent_required=True
+            [agent]
+            extensions=fdb
+            [FDB]
+            shared_physical_device_mappings=default:${pf}
+            [[test-config|\$TEMPEST_CONFIG]]
+            [network]
+            port_vnic_type=direct
+            [network-feature-enabled]
+            api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+            EOF
+            echo "FINISHED: ############## $phase  ###################"
