@@ -24,9 +24,10 @@
                 echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg"
                 exit 1
             fi
-            # Workaround for Ub16.04
-            sudo sh -c  "echo 4 > /sys/class/infiniband/mlx5_0/device/mlx5_num_vfs" 2>&1|tee > /dev/null
-            sudo sh -c  "echo 4 > /sys/class/infiniband/mlx5_1/device/mlx5_num_vfs" 2>&1|tee > /dev/null
+            export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
+            echo "Using pci=$pci pf=$pf HCA=$HCA"
+            sudo sh -c  "echo 4 > /sys/class/net/$pf/device/mlx5_num_vfs" 2>&1|tee > /dev/null
             sudo timedatectl set-timezone 'Asia/Jerusalem'
             env
 
@@ -77,16 +78,6 @@
             for project in ${projects[@]}; do
                 [ -d /etc/$project ] && cp -r /etc/$project $CI_ARTIFACTS/etc/
             done
-
-            #for d in $(find /opt/stack/ -maxdepth 1 -type d )
-            #do
-            #    pushd $d > /dev/null
-            #    x=$(git rev-parse HEAD 2>/dev/null)
-            #    if [ $? -eq 0 ]; then
-            #        echo "$d $x" >> $CI_ARTIFACTS/env/stack_commits.txt
-            #    fi
-            #    popd > /dev/null
-            #done
 
             [ -d /opt/stack/tempest/.testrepository ] && cp -L -r /opt/stack/tempest/.testrepository $CI_ARTIFACTS/
             [ -f /opt/stack/tempest/tempest.log ] && cp -L /opt/stack/tempest/tempest.log $LOGDIR/
@@ -153,10 +144,9 @@
             # Check Cinder leftovers
             if [ $(echo $JOB_NAME|grep Cinder) ]; then
                 echo "Cleaning Cinder left volumes"
-                sudo pip install rtslib_fb
                 sudo lvs
                 sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
-                sudo service tgt restart > /dev/null 2>&1 || true
+                sudo service tgt stop > /dev/null 2>&1 || true
             fi
 
             sudo kill $(pgrep rabbitmq)
@@ -256,8 +246,8 @@
             echo "STARTED: ############## $phase  ###################"
 
             echo "Delete all Bridges"
-            br=$(sudo ovs-vsctl list-br)
-            if [ $br ]; then
+            br=$(sudo ovs-vsctl list-br 2>&1|tee)
+            if [ ! -z "$br" ]; then
                 for br in $(sudo ovs-vsctl list-br); do
                     sudo ovs-vsctl del-br $br 2>&1|tee > /dev/null
                 done
@@ -285,8 +275,6 @@
 
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
-            #cd /opt/stack/tempest
-            #git pull git://git.openstack.org/openstack/tempest refs/changes/80/437880/1
 
 
 - builder:
@@ -322,20 +310,12 @@
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
-          #TODO add 'stable/ocata' for ocata
           if [ $ZUUL_BRANCH == 'stable/newton' ]; then
               export MLNX_DRIVER='mlnx'
-              #export PCI_WHITE_LIST="pci_"
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
           else
               export MLNX_DRIVER='mlnx_infiniband'
-              #export PCI_WHITE_LIST="[pci]
-          #"
           fi
-          #if [ $ZUUL_BRANCH == 'stable/mitaka' ]; then
-          #    export OVS_WA="[ovs]
-          #of_interface=ovs-ofctl
-          #"
-          #fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
@@ -414,19 +394,6 @@
           enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,DiskFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
           [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
           ${OVS_WA}
-          #[[post-extra|\$TEMPEST_CONFIG]]
-          #[compute-feature-enabled]
-          #suspend=false
-          #resize=false
-          #[network]
-          #port_vnic_type=direct
-          #[network-feature-enabled]
-          #port_admin_state_change=false
-          #[scenario]
-          #dhcp_client=
-          #[compute]
-          #flavor_ref=2
-          #flavor_ref_alt=2
           [[test-config|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           suspend=false
@@ -461,16 +428,9 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
+          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
+          fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -538,13 +498,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #[[post-extra|\$TEMPEST_CONFIG]]
-          #[network]
-          #port_vnic_type=macvtap
-          #[network-feature-enabled]
-          #api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
-          #[compute-feature-enabled]
-          #resize=false
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=macvtap
@@ -573,15 +526,9 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
+          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
+          fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -648,11 +595,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #          [[post-extra|\$TEMPEST_CONFIG]]
-          #          [network]
-          #          port_vnic_type=direct
-          #          [network-feature-enabled]
-          #          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
@@ -682,18 +624,11 @@
 
           if [ "$ZUUL_BRANCH" == 'stable/newton' ]; then
               export MLNX_DRIVER='sdnmechdriver,mlnx'
-          #             export PCI_WHITE_LIST="pci_"
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
           else
               export MLNX_DRIVER='mlnx_sdn_assist,mlnx_infiniband'
-          #              export PCI_WHITE_LIST="[pci]
-          #"
           fi
 
-          #if [ $ZUUL_BRANCH == 'stable/mitaka' ]; then
-          #    export OVS_WA="[ovs]
-          #of_interface=ovs-ofctl
-          #"
-          #fi
           echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
@@ -775,18 +710,6 @@
           username = admin
           password = admin
           ${OVS_WA}
-          [[post-extra|\$TEMPEST_CONFIG]]
-          [compute-feature-enabled]
-          resize=false
-          [network]
-          port_vnic_type=direct
-          [network-feature-enabled]
-          port_admin_state_change=false
-          [scenario]
-          dhcp_client=
-          [compute]
-          flavor_ref=2
-          flavor_ref_alt=2
           [[test-config|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           resize=false
@@ -820,15 +743,10 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
+
+          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
+          fi
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -897,11 +815,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #          [[post-extra|\$TEMPEST_CONFIG]]
-          #          [network]
-          #          port_vnic_type=macvtap
-          #          [compute-feature-enabled]
-          #          resize=false
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=macvtap
@@ -929,15 +842,10 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
+          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
+          fi
+
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1005,9 +913,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #          [[post-extra|\$TEMPEST_CONFIG]]
-          #          [network]
-          #          port_vnic_type=direct
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
@@ -1034,15 +939,10 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
+          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
+              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
+          fi
+
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1110,9 +1010,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-           #          [[post-extra|\$TEMPEST_CONFIG]]
-           #          [network]
-            #          port_vnic_type=direct
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
@@ -1137,17 +1034,7 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #   export PCI_WHITE_LIST="pci_"
-          #fi
-          #export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
-          env
+          export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-27"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -1158,8 +1045,8 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1200,9 +1087,19 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api,n-cond
+
+          #enable_service n-cpu q-agt n-api-meta n-novnc n-xvnc q-sriov-agt
+          #ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api,n-cond
+          #enable_plugin neutron $NEUTRON_REPO
+          #disable_service tempest n-cauth c-vol etcd3
+          #enable_service n-cpu q-agt n-api-meta n-novnc n-xvnc q-sriov-agt placement-api
+
+          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api
           enable_plugin neutron $NEUTRON_REPO
           disable_service tempest n-cauth c-vol etcd3
+
+
+
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1243,18 +1140,8 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          #if [[ $ZUUL_BRANCH == "master" || -z "$ZUUL_BRANCH" ]]; then
-          #    export EXTENSION="extensions=fdb
-          #[FDB]
-          #shared_physical_device_mappings=default:${mlnx_port}"
-          #    export PCI_WHITE_LIST="[pci]
-          #"
-          #else
-          #    export PCI_WHITE_LIST="pci_"
-          #fi
 
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
-          env
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -1268,8 +1155,8 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          SYSLOG=False
+          USE_SCREEN=True
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1302,8 +1189,10 @@
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc n-cpu placement-api q-qos
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc
           enable_plugin neutron $NEUTRON_REPO
+          #LNY
+          # placement-api q-qos
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -1322,13 +1211,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #          [[post-extra|\$TEMPEST_CONFIG]]
-          #          [compute-feature-enabled]
-          #          migrate=True
-          #          [compute]
-          #          min_compute_nodes=2
-          #          [network]
-          #          port_vnic_type=direct
           [[test-config|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           migrate=True
@@ -1352,7 +1234,6 @@
 
           #git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           git clone https://github.com/Mellanox/mlnx-project-config.git $WORKSPACE/mlnx-project-config
-          #git clone git://git.openstack.org/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1370,10 +1251,6 @@
           fi
 
           date +"%Y-%m-%d %H:%M:%S" > /tmp/stack_started.txt
-          #export ESWITCHD_BRANCH="master"
-          echo "****************** LNY **********************"
-          ps -ef |grep python
-          echo "****************** LNY **********************"
           BUILD_ID=dontKillMe $WORKSPACE/devstack/stack.sh
           rc=$?
 
@@ -1400,7 +1277,6 @@
           do
               echo "saving $s in $CI_ARTIFACTS/$s.log"
               sudo journalctl -o short-precise --unit $s -S "$(cat /tmp/stack_started.txt)" > $CI_ARTIFACTS/$s.log
-              #sudo journalctl -o short-precise --unit $s > $CI_ARTIFACTS/$s.log
           done
 
 
@@ -1680,13 +1556,13 @@
             source $WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/devstack/openrc admin
             nova-manage cell_v2 discover_hosts
             nova hypervisor-list
+            sleep 60
 
             [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
             echo "STARTED: ############## $phase  ###################"
             tests=(
-                  #TOFIX tests fail unless nova sch is restarted. Seems that sch ignoring schedule_hints
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
-                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_migration_revert
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration_revert
                   tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration
             )
             pushd /opt/stack/tempest
@@ -2006,400 +1882,3 @@
             bash -x $tmp_file 2>&1|tee > /dev/null
             rm -f $tmp_file
             echo "FINISHED: ############## $phase  ###################"
-
-
-- builder:
-    name: configure-devstack-Cinder-ISER-ISCSI
-    builders:
-      - shell: |
-          #!/bin/bash +e
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
-          if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
-              echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
-              exit 1
-          fi
-
-          cat > devstack/local.conf <<EOF
-          [[local|localrc]]
-          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
-          ADMIN_PASSWORD=password
-          MYSQL_PASSWORD=password
-          RABBIT_PASSWORD=password
-          SERVICE_PASSWORD=password
-          SERVICE_TOKEN=servicetoken
-
-          LIBS_FROM_GIT=os-brick
-          RECLONE=yes
-          LOG_COLOR=False
-          LOGDIR=\${LOGDIR:-/opt/stack/logs}
-          LOGFILE=\$LOGDIR/stack.sh.log
-          SCREEN_LOGDIR=\$LOGDIR/screen
-          LOGDAYS=2
-
-          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng n-cauth q-lbaas etcd3
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
-          disable_service n-novnc n-xvnc horizon
-          enable_service tempest
-          mlnx_dev=$mlnx_dev
-          mlnx_port=$mlnx_port
-          epioib_port=$epioib_port
-
-          #Neutron Configuration
-          Q_PLUGIN=ml2
-          Q_AGENT=openvswitch
-          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
-          Q_USE_DEBUG_COMMAND=False
-          ENABLE_TENANT_VLANS=True
-          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
-          ENABLE_TENANT_TUNNELS=False
-          Q_ML2_TENANT_NETWORK_TYPE=vlan
-          TENANT_VLAN_RANGE=2:100
-          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          PHYSICAL_INTERFACE=$mlnx_port
-          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
-          ALLOW_NEUTRON_DB_MIGRATIONS=true
-          Q_USE_PROVIDERNET_FOR_PUBLIC=False
-          Q_USE_SECGROUP=True
-          PHYSICAL_NETWORK=default
-
-          SWIFT_HASH=password
-          SWIFT_REPLICAS=1
-          SWIFT_DATA_DIR=$DEST/data
-
-          [[post-config|/etc/cinder/cinder.conf]]
-          [DEFAULT]
-          enabled_backends = lvmdriver-1, backend1, backend2
-
-          [backend1]
-          iscsi_ip_address=1.1.1.1
-          iscsi_helper=tgtadm
-          iscsi_protocol = iser
-          iscsi_port = 3260
-          volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
-          volume_backend_name = backend1
-          volume_group = stack-volumes-lvmdriver-1
-
-          [backend2]
-          iscsi_ip_address=1.1.1.1
-          iscsi_helper=tgtadm
-          iscsi_protocol = iser
-          iscsi_port = 3260
-          volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
-          volume_backend_name = backend2
-          volume_group = stack-volumes-lvmdriver-1
-
-          [[post-extra|\$TEMPEST_CONFIG]]
-          [volume]
-          backend1_name = backend1
-          backend2_name = backend2
-          [volume-feature-enabled]
-          multi_backend = True
-
-          [[test-config|\$TEMPEST_CONFIG]]
-          [volume]
-          backend1_name = backend1
-          backend2_name = backend2
-          [volume-feature-enabled]
-          multi_backend = True
-
-
-          EOF
-
-- builder:
-    name: configure-devstack-Cinder-ISER-LIO
-    builders:
-      - shell: |
-          #!/bin/bash +ex
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
-          if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
-              exit 1
-          fi
-
-          cat > devstack/local.conf <<EOF
-          [[local|localrc]]
-          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
-          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
-          ADMIN_PASSWORD=password
-          MYSQL_PASSWORD=password
-          RABBIT_PASSWORD=password
-          SERVICE_PASSWORD=password
-          SERVICE_TOKEN=servicetoken
-          mlnx_dev=$mlnx_dev
-          mlnx_port=$mlnx_port
-
-          LIBS_FROM_GIT=os-brick
-          RECLONE=yes
-          LOG_COLOR=False
-          PIP_UPGRADE=True
-          LOGDIR=\${LOGDIR:-/opt/stack/logs}
-          LOGFILE=\$LOGDIR/stack.sh.log
-          SCREEN_LOGDIR=\$LOGDIR/screen
-          LOGDAYS=2
-
-          disable_service n-net heat h-api h-api-cfn h-api-cw h-eng q-lbaas n-cauth etcd3
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
-          disable_service n-novnc n-xvnc horizon
-          enable_service tempest
-
-          #Neutron Configuration
-          Q_PLUGIN=ml2
-          Q_AGENT=openvswitch
-          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
-          Q_USE_DEBUG_COMMAND=False
-          ENABLE_TENANT_VLANS=True
-          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
-          ENABLE_TENANT_TUNNELS=False
-          Q_ML2_TENANT_NETWORK_TYPE=vlan
-          TENANT_VLAN_RANGE=2:100
-          NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          PHYSICAL_INTERFACE=$mlnx_port
-          OVS_PHYSICAL_BRIDGE=br-$mlnx_port
-          ALLOW_NEUTRON_DB_MIGRATIONS=true
-          Q_USE_PROVIDERNET_FOR_PUBLIC=False
-          Q_USE_SECGROUP=True
-          PHYSICAL_NETWORK=default
-
-          SWIFT_HASH=password
-          SWIFT_REPLICAS=1
-          SWIFT_DATA_DIR=$DEST/data
-
-          [[post-config|/etc/cinder/cinder.conf]]
-          [DEFAULT]
-          iscsi_helper=lioadm
-          enabled_backends =lvmdriver-1,backend1, backend2
-
-          [lvmdriver-1]
-          iscsi_ip_address=1.1.1.1
-          iscsi_helper=lioadm
-          iscsi_port = 3261
-          volume_group = stack-volumes-lvmdriver-1
-          iscsi_protocol = iser
-          volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
-          volume_backend_name = lvmdriver-1
-
-
-          [backend1]
-          iscsi_ip_address=1.1.1.1
-          iscsi_helper=lioadm
-          iscsi_protocol = iser
-          iscsi_port = 3261
-          volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
-          volume_backend_name = backend1
-          volume_group = stack-volumes-lvmdriver-1
-
-          [backend2]
-          iscsi_ip_address=1.1.1.1
-          iscsi_helper=lioadm
-          iscsi_protocol = iser
-          iscsi_port = 3261
-          volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
-          volume_backend_name = backend2
-          volume_group = stack-volumes-lvmdriver-1
-
-          [[post-extra|\$TEMPEST_CONFIG]]
-          [volume]
-          backend1_name = backend1
-          backend2_name = backend2
-          [volume-feature-enabled]
-          multi_backend = True
-
-          [[test-config|\$TEMPEST_CONFIG]]
-          [volume]
-          backend1_name = backend1
-          backend2_name = backend2
-          [volume-feature-enabled]
-          multi_backend = True
-          EOF
-
-
-- builder:
-    name: run-tests-cinder
-    builders:
-      - shell: |
-                #!/bin/bash +ex
-
-                HCA=${HCA:-"mlx4"}
-                mlx=`echo $HCA | sed s/mlx//g`
-                let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-
-                sudo ifconfig $mlnx_port 1.1.1.1/16 up
-
-                echo "============ Starting tempest tests ====================="
-                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
-                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
-                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
-                       tempest.scenario.test_stamp_pattern.TestStampPattern
-                )
-                cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
-                virtualenv virt --no-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
-                test_pass=$?
-                deactivate
-
-                if [[ $test_pass -ne 0 ]]; then
-                    echo "FINISHED with ERROR: ############## $phase  ###################"
-                    exit 1
-                fi
-
-- builder:
-    name: run-tests-cinder-lio-simx
-    builders:
-      - shell: |
-                #!/bin/bash +ex
-
-                HCA=${HCA:-"mlx4"}
-                mlx=`echo $HCA | sed s/mlx//g`
-                let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-
-                sudo ifconfig $mlnx_port 1.1.1.1/16 up
-
-                echo "============ Starting tempest tests ====================="
-                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
-                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
-                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
-                       tempest.scenario.test_stamp_pattern.TestStampPattern
-                )
-                cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
-                test_pass=0
-                for test in ${tests[@]}; do
-                    testr run $test
-                    rc=$?
-                    let test_pass=test_pass+$rc
-                done
-                #virtualenv virt --no-site-packages
-                #. virt/bin/activate
-                #virt/bin/pip install -U -r requirements.txt
-                #testr run ${tests[@]}
-                #test_pass=$?
-                #deactivate
-
-                if [[ $test_pass -ne 0 ]]; then
-                    echo "FINISHED with ERROR: ############## $phase  ###################"
-                    exit 1
-                fi
-
-- builder:
-    name: run-tests-cinder-iscsi-simx
-    builders:
-      - shell: |
-                #!/bin/bash +ex
-
-                HCA=${HCA:-"mlx4"}
-                mlx=`echo $HCA | sed s/mlx//g`
-                let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-
-                sudo ifconfig $mlnx_port 1.1.1.1/16 up
-
-                echo "============ Starting tempest tests ====================="
-                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
-                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
-                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
-                       tempest.scenario.test_stamp_pattern.TestStampPattern
-                )
-                cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
-                virtualenv virt --no-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
-                test_pass=$?
-                deactivate
-
-                if [[ $test_pass -ne 0 ]]; then
-                    echo "FINISHED with ERROR: ############## $phase  ###################"
-                    exit 1
-                fi
-
-
-- builder:
-    name: load-vm
-    builders:
-        - shell: |
-            #!/bin/bash -x
-            SIMX_VM=${SIMX_VM:-'cloudx-17-07'}
-            phase="Loading VM $SIMX_VM"
-            echo "STARTED: ############## $phase  ###################"
-            sudo ls /var/lib/libvirt/images
-            sudo virsh shutdown --domain $SIMX_VM 2>&1|tee
-            #TODO add while it's not shuted down
-            virsh list | grep $SIMX_VM
-            sleep 120
-            sudo virsh snapshot-revert --domain $SIMX_VM --snapshotname $SIMX_SNAPSHOT --running
-            retries=10
-            while [ $retries -gt 0 ]; do
-                state=$(sudo virsh list | grep $SIMX_VM | awk '{print $3}')
-                if [ $state == 'running'  ]; then
-                    echo "$SIMX_VM is running"
-                    exit 0
-                fi
-                let retries=retries-1
-                sleep 6
-            done
-            echo "$SIMX_VM is not running"
-            exit 1
-
-- builder:
-    name: waitforonline-vm
-    builders:
-        - python: |
-            #!/usr/bin/python
-            import requests
-            import sys
-            import time
-            import os
-            from pprint import pprint
-
-            timeout = 500
-            stop = time.time() + timeout
-
-            SIMX_VM = os.environ.get('SIMX_VM','cloudx-17-07')
-            pprint(os.environ)
-            phase="Waiting for Online status of %s" % SIMX_VM
-            print phase
-            url = 'http://10.224.33.37:8080/computer/%s/api/json' % SIMX_VM
-            start = time.time()
-            print "Started", start
-            print "Time", time.time()
-            while (time.time() < stop):
-                r = requests.get(url)
-                if r.json()['offline']:
-                    time.sleep(2)
-                else:
-                    t = (time.time() - start)
-                    print "%s is Online after %d sec" % (SIMX_VM, t)
-                    time.sleep(20)
-                    sys.exit(0)
-            print "%s still Offline after %s seconds" % (SIMX_VM, timeout)
-            pprint(r.json())
-            sys.exit(1)

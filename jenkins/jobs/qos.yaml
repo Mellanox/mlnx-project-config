@@ -13,7 +13,7 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            HCA=MT27710
+            HCA=27800
             RX_RATE_LIMIT=10
             PATH=$PATH:/usr/sbin
             EXT_SERVER=52.169.200.208

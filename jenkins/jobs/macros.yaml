@@ -7,7 +7,26 @@
       - collect-artifacts
       - shell: |
           #!/bin/bash -x
-          BUILD_ID=dontKillMe nohup $WORKSPACE/mlnx-project-config/tools/grab_console_log.sh > /dev/null &
+          log_file=/tmp/console.html
+          arch=${log_file}.gz
+          rm -f $log_file $arch
+          cd $WORKSPACE
+
+          [ -f grab_console_log.sh ] && rm -f grab_console_log.sh
+          wget https://raw.githubusercontent.com/midonet/openstack-project-config/master/jenkins/scripts/grab_console_log.sh
+          bash ./grab_console_log.sh
+
+          cat $log_file | grep 'marked build as failure'
+          if [ $? -ne 0 ]; then
+              echo "Finished: SUCCESS" >> $log_file
+          else
+              echo "Finished: FAILURE" >> $log_file
+          fi
+
+          gzip -9 -r $log_file 2>&1|tee >/dev/null
+          scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}/${NODE_TYPE}/
+          rm -rf $arch $log_dir
+
 
 - publisher:
     name: upload-console-log
