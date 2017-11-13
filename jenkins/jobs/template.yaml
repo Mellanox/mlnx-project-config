@@ -78,8 +78,6 @@
             RABBIT_PASSWORD=password
             SERVICE_PASSWORD=password
             HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-            SYSLOG=False
-            USE_SCREEN=True
             SUBNETPOOL_PREFIX_V4=172.0.0.0/16
             pci=$pci
             pf=$pf

@@ -74,8 +74,6 @@
           SWIFT_HASH=password
           SWIFT_ENABLE_TEMPURLS=True
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           RECLONE=yes
 

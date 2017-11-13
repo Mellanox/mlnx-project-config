@@ -25,14 +25,9 @@
       - configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
       #- 'run-tests-{name}-API'
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -76,13 +71,8 @@
       - configure-devstack-Nova-MACVTAP-ML2-Sriov
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -123,16 +113,12 @@
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      - configure-devstack-Nova-ML2-Sriov
+      #- configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -220,14 +206,9 @@
       - configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
       #- 'run-tests-{name}-API'
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -271,17 +252,10 @@
       - configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - delete-mac-nova # remove macs
-      #- add-mac-nova # workaround to add mac to the bridge
       #- run-tests-neutron
-      #- delete-mac-nova # remove macs
       #- 'run-tests-{name}-API'
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-basic
-      - delete-mac-nova # remove macs
-      - add-mac-nova # workaround to add mac to the bridge
       - run-tests-network-advanced
-      - delete-mac-nova # remove macs
       - produce-readme-file
     properties:
       - build-discarder:
@@ -382,76 +356,6 @@
 
 
 - job:
-    name: Mellanox-CI-Daily-StableNewton-Status
-    project-type: multijob
-    node: daily
-    triggers:
-      - timed: 'H 0 * * *'
-    builders:
-      - multijob:
-           name: Mellanox-CI-Daily-StableNewton-Status
-           condition: ALWAYS
-           projects:
-              - name: Nova-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-              - name: Nova-MACVTAP-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   NOVA_BRANCH=refs/changes/05/490405/1
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-                   FORCE=yes
-              - name: Tempest-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-                   FORCE=yes
-              - name: Neutron-ML2-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-                   FORCE=yes
-              - name: Neutron-ML2-MLNX
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-                   FORCE=yes
-              - name: Neutron-Networking-MLNX-ML2
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/newton
-                   REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-                   FORCE=yes
-              #- name: Cinder-ISER-LIO
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/newton
-              #     REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-              #     FORCE=yes
-              #- name: Cinder-ISER-ISCSI
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/newton
-              #     REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-              #     FORCE=yes
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    wrappers:
-      - timeout:
-          timeout: 500
-
-- job:
     name: Mellanox-CI-Daily-StablePike-Status
     project-type: multijob
     node:  daily
@@ -490,23 +394,23 @@
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=master
+                   ZUUL_BRANCH=stable/pike
                    FORCE=yes
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=master
+                   ZUUL_BRANCH=stable/pike
                    FORCE=yes
-              #- name: Cinder-ISER-LIO
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
-              #- name: Cinder-ISER-ISCSI
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/pike
+                   FORCE=yes
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/pike
+                   FORCE=yes
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -534,6 +438,7 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
               #- name: Nova-ML2-Sriov-Multinode
               #  current-parameters: true
               #  predefined-parameters: |
@@ -544,16 +449,19 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
               - name: Tempest-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
@@ -564,16 +472,16 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
-              #- name: Cinder-ISER-LIO
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/ocata
-              #     FORCE=yes
-              #- name: Cinder-ISER-ISCSI
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/ocata
-              #     FORCE=yes
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/ocata
+                   FORCE=yes
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -600,8 +508,8 @@
                 current-parameters: true
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
-              #- name: Nova-ML2-Sriov-Multinode
-              #  current-parameters: true
+              - name: Nova-ML2-Sriov-Multinode
+                current-parameters: true
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
@@ -612,8 +520,8 @@
                 current-parameters: true
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
-              - name: NVMe
-                current-parameters: true
+              #- name: NVMe
+              #  current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
               - name: Neutron-MACVTAP-ML2-Sriov
@@ -629,7 +537,6 @@
     wrappers:
       - timeout:
           timeout: 500
-
 
 ######################################################
 ###               MULTI NODE CI     ##################
@@ -662,6 +569,7 @@
       - configure-devstack-{name}
       - run-stacksh
       - apply-workarounds-post-stack
+      - apply-workarounds-post-stack-{name}
       - apply-workarounds-tempest
     properties:
       - build-discarder:
@@ -702,6 +610,7 @@
       - configure-devstack-{name}
       - run-stacksh
       - apply-workarounds-post-stack
+      - apply-workarounds-post-stack-{name}
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -736,7 +645,6 @@
       - mlnx-project-config
       - run-tests-multinode
       - stop-stacksh
-      - delete-mac-nova
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -763,7 +671,6 @@
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
        - stop-stacksh
-       - delete-mac-nova
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -792,7 +699,7 @@
            projects:
               - name: Nova-ML2-Sriov-Multinode-Compute
                 current-parameters: true
-                predefined-parameters: CONTROLLER_NODE=cloudx-27
+                predefined-parameters: CONTROLLER_NODE=10.224.33.57
        - multijob:
            name: Tempest
            condition: SUCCESSFUL

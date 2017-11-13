@@ -11,7 +11,7 @@
             echo "Using pci=$pci pf=$pf"
 
             sudo ovs-dpctl del-dp ovs-system 2>&1|tee
-            sudo modprobe -r openvswitch
+            sudo modprobe -r openvswitch 2>&1|tee > /dev/null
 
 
 - builder:
@@ -78,10 +78,14 @@
           phase="CONFIGURE-DEVSTACK-Multinode-Controller"
           echo "STARTED: ############## $phase  ###################"
 
-          export pci=$(lspci |grep Mell|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
           export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
           echo "pci=$pci, pf=$pf"
-
+          if [ -z "$ZUUL_PROJECT" ] || [ "$ZUUL_PROJECT" == 'openstack/os-vif' ]; then
+              export NEUT="NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
+          else
+              export NEUT="#NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
+          fi
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -96,7 +100,10 @@
           HOST_IP=$(hostname -i)
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
 
-          NEUTRON_BRANCH=$NEUTRON_BRANCH
+          $NEUT
+          NOVA_BRANCH=refs/changes/13/505613/12
+          TEMPEST_BRANCH=refs/changes/75/499575/3
+
           LIBS_FROM_GIT=os-vif,neutron-lib
           Q_BUILD_OVS_FROM_GIT=True
 
@@ -134,8 +141,6 @@
           enable_plugin neutron https://github.com/openstack/neutron
           enable_plugin os-vif https://github.com/openstack/os-vif
 
-          USE_SCREEN=False
-          SYSLOG=True
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
@@ -151,13 +156,15 @@
           [compute-feature-enabled]
           suspend=false
           resize=false
+          [auth]
+          tempest_roles = Admin
           EOF
 
           echo "FINISHED: ############## $phase  ###################"
 
 - project:
     name: VLAN-ASAP-Configure
-    node: ASAP
+    node: OVS_HW_offload
     jobs:
       - 'VLAN-ASAP-Configure'
 
@@ -177,7 +184,7 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT27800
+            HCA=MT27710
             PATH=$PATH:/usr/sbin
             RELEASE=latest
        - asap-configure
@@ -188,12 +195,45 @@
           artifact-days-to-keep: 60
           artifact-num-to-keep: 200
 
-
 - project:
     name: 'OVS_HW_offload'
     node: OVS_HW_offload
     jobs:
       - 'OVS_HW_offload'
+      - 'OVS_HW_offload_Neutron'
+
+- job-template:
+    name: 'OVS_HW_offload_Neutron'
+    node: '{node}'
+    concurrent: false
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=52.169.200.208
+            LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=52.169.200.208
+            HCA=MT27710
+            PATH=$PATH:/usr/sbin
+            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/4
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack-asap-vlan
+      - configure-devstack-OVS_HW_offload
+      - run-stacksh
+      - apply-workarounds-post-stack-asap-vlan
+      - run-tests-network-asap
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - upload-console-log-mn #This line must be the last one
+
 
 - job-template:
     name: 'OVS_HW_offload'
@@ -205,11 +245,10 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
             IMAGE_SERVER=52.169.200.208
-            HCA=MT27800
+            HCA=MT27710
             PATH=$PATH:/usr/sbin
-            NEUTRON_BRANCH=refs/changes/90/481890/3
+            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/4
             #OVS_BRANCH="master"
       - check-environment
       - mlnx-project-config
@@ -238,7 +277,7 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT27800
+            HCA=MT27710
             PATH=$PATH:/usr/sbin
             RELEASE_DIR=/jenkins/ASAP
             RELEASE=ASAP2_DIRECT-3.0-rc29

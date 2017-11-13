@@ -24,10 +24,12 @@
             i=1
             export ip1=1.1.1.1
             export ip2=2.2.2.2
-            pci=$(lspci |grep $HCA | grep -v Virtual | awk '{print $1}')
-            for pf in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}'); do
-                sudo ifconfig $pf $i.$i.$i.$i/24 up
-                let i=i+1
+
+            for pci in $(lspci |grep $HCA | grep -v Virtual | awk '{print $1}');do
+                for p in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}');do
+                    sudo ifconfig $p $i.$i.$i.$i/24 up
+                    let i=i+1
+                done
             done
 
             if [[ -n $ZUUL_PROJECT ]]; then
@@ -46,8 +48,6 @@
             RABBIT_PASSWORD=password
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
-            SYSLOG=True
-            USE_SCREEN=False
 
             HOST_IP=$(host $(hostname) | cut -d' ' -f4)
 
@@ -63,8 +63,13 @@
             VOLUME_NAME_PREFIX="volume-"
             VOLUME_BACKING_FILE_SIZE=10250M
 
+            #DISABLED_SERVICES=n-net
+            #ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
+            #disable_service=horizon
             DISABLED_SERVICES=n-net
-            ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
+            enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
+            disable_service = horizon
+
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -473,7 +478,7 @@
                        tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                        tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest
-                       empest.api.volume.admin.test_volume_types_extra_specs_negative
+                       tempest.api.volume.admin.test_volume_types_extra_specs_negative
                 )
                 cd /opt/stack/tempest
                 testr list-tests ${tests[@]}

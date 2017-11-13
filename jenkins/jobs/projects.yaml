@@ -85,3 +85,40 @@
     node: SRIOV_MN_COMPUTE
     jobs:
         - 'Nova-ML2-Sriov-Multinode-StopCompute'
+
+########### SimX #############################
+#- project:
+#    name: SimX-Run-ISER-LIO
+#    github-org: openstack-dev
+#    node: CINDER-SIMX-LIO
+#    jobs:
+#        - 'SimX-Run-ISER-LIO'
+
+#- project:
+#    name: SimX-Run-ISER-ISCSI
+#    github-org: openstack-dev
+#    node: CINDER-SIMX-ISCSI
+#    jobs:
+#        - 'SimX-Run-ISER-ISCSI'
+
+#- project:
+#    name: SimX-Run-VM
+#    github-org: openstack-dev
+#    node: SimX-Server
+#    jobs:
+#        - 'SimX-Run-VM'
+#- project:
+#    name: Cinder-ISER-ISCSI
+#    github-org: openstack-dev
+#    node: CINDER
+#    jobs:
+#        - 'Cinder-ISER-ISCSI'
+#- project:
+#    name: Cinder-ISER-LIO
+#    github-org: openstack-dev
+#    node: CINDER
+#    jobs:
+#        - 'Cinder-ISER-LIO'
+
+
+

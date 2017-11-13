@@ -1,13 +1,13 @@
 - project:
     name: NVMe
-    node: CINDER
+    node: NVME
     jobs:
       - 'NVMe'
 
 - job-template:
     name: 'NVMe'
     node: '{node}'
-    concurrent: false
+    concurrent: true
     parameters:
     builders:
       - inject:
@@ -19,9 +19,14 @@
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-            NOVA_BRANCH=refs/changes/40/482640/9
-            MLNX_CINDER_BRANCH=refs/changes/62/482562/24
-            MLNX_OS_BRICK_BRANCH=refs/changes/42/482642/17
+            HORIZON_REPO=ssh://cloudx-17/images/openstack/horizon
+            REQUIREMENTS_REPO=ssh://cloudx-17/images/openstack/requirements
+            KEYSTONE_REPO=ssh://cloudx-17/images/openstack/keystone
+            NEUTRON_REPO=ssh://cloudx-17/images/openstack/neutron
+            GLANCE_REPO=ssh://cloudx-17/images/openstack/glance
+            MLNX_CINDER_BRANCH=refs/changes/56/505556/8
+            MLNX_OS_BRICK_BRANCH=refs/changes/42/482642/24
+            NOVA_BRANCH=refs/changes/40/482640/11
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -34,6 +39,7 @@
       - apply-workarounds-post-stack
       - apply-workarounds-post-stack-{name}
       - run-tests-{name}
+      - run-tests-{name}-Tempest
       - produce-readme-file
     properties:
       - build-discarder:
@@ -87,9 +93,14 @@
             for module in nvme nvmet nvmet-rdma nvme-rdma
             do
                 sudo modprobe $module
-                let status=status+1
+                let status=status+$?
             done
-            status=$?
+            nc=$(lsmod |awk '{print $1}'|egrep "nvme$|nvmet|nvmet_rdma|nvme_rdma"|wc -l)
+            if [ $nc -lt 4 ];then
+                lsmod |grep nvme
+                echo "Check if nvme|nvmet|nvmet_rdma|nvme_rdma are up"
+                let status=status+$?
+            fi
             exit $status
 
 - builder:
@@ -98,22 +109,22 @@
         - shell: |
             #!/bin/bash -x
             echo "apply-workarounds-post-stack-NVMe"
-
-            if [ -z $ZUUL_CHANGE ]; then
-                cd /opt/stack/os-brick
-                git fetch git://git.openstack.org/openstack/os-brick $MLNX_OS_BRICK_BRANCH && git cherry-pick FETCH_HEAD
-                cd /opt/stack/cinder
-                git fetch git://git.openstack.org/openstack/cinder $MLNX_CINDER_BRANCH && git cherry-pick FETCH_HEAD
-            else
-                if [ $ZUUL_CHANGE != '482748' ]; then
+            exit 0
+            #if [ -z $ZUUL_CHANGE ]; then
+            #    cd /opt/stack/os-brick
+            #    git fetch git://git.openstack.org/openstack/os-brick $MLNX_OS_BRICK_BRANCH && git cherry-pick FETCH_HEAD
+            #    cd /opt/stack/cinder
+            #    git fetch git://git.openstack.org/openstack/cinder $MLNX_CINDER_BRANCH && git cherry-pick FETCH_HEAD
+            #else
+                if [ $ZUUL_CHANGE != '482642' ]; then
                     cd /opt/stack/os-brick
                     git fetch git://git.openstack.org/openstack/os-brick $MLNX_OS_BRICK_BRANCH && git cherry-pick FETCH_HEAD
                 fi
-                if [ $ZUUL_CHANGE != '482562' ]; then
+                if [ $ZUUL_CHANGE != '505556' ]; then
                     cd /opt/stack/cinder
                     git fetch git://git.openstack.org/openstack/cinder $MLNX_CINDER_BRANCH && git cherry-pick FETCH_HEAD
                 fi
-            fi
+            #fi
 
             sudo chmod 777 /etc/cinder/rootwrap.d/volume.filters
             sudo cat >> /etc/cinder/rootwrap.d/volume.filters <<EOF
@@ -124,62 +135,95 @@
             sudo systemctl restart devstack@c-vol.service
             sudo systemctl restart devstack@n-cpu.service
 
+- builder:
+    name: run-tests-NVMe-Tempest
+    builders:
+      - shell: |
+                #!/bin/bash +ex
+                echo "============ Starting tempest tests ====================="
+                tests=(
+                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
+                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
+                       tempest.scenario.test_stamp_pattern.TestStampPattern
+                       tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest
+                       tempest.api.volume.admin.test_volume_types_extra_specs_negative
+                )
+                cd /opt/stack/tempest
+                testr list-tests ${tests[@]}
+                testr init
+                virtualenv virt --no-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+                testr run ${tests[@]}
+                test_pass=$?
+                deactivate
+
+                if [[ $test_pass -ne 0 ]]; then
+                    echo "FINISHED with ERROR: ############## $phase  ###################"
+                    exit 1
+                fi
 
 - builder:
     name: run-tests-NVMe
     builders:
         - shell: |
             #!/bin/bash
-            phase="RUN-TESTS-attach"
-            pushd $WORKSPACE/devstack
-            status=0
-            . openrc
-            cinder create 1
-            image=$(glance image-list|grep "cir"|awk '{print $4}')
-            nova boot --flavor m1.small --image $image vm1
-            sleep 240
-            nova list
-            cinder list
-            echo "Attaching nova volume"
-            nova=$(nova list | awk '{print $2}' | grep '-')
-            cinder_vol=$(cinder list| awk '{print $2}' | grep '-')
-
-
-            nova volume-attach $nova $cinder_vol
-            sleep 20
-            vstat=$(cinder list|grep lvmdriver-1 |awk '{print $4}')
-            nova list
-            cinder list
-            if [ "$vstat" != "in-use" ]; then
-                cinder list
+            if [ ! -z $ZUUL_CHANGE ]; then
+                if [ $ZUUL_CHANGE != '482642' ] || [ $ZUUL_CHANGE != '505556' ]; then
+                    echo "NVME tests skiped"
+                    exit 0
+                fi
+            fi
+                phase="RUN-TESTS-attach"
+                pushd $WORKSPACE/devstack
+                status=0
+                . openrc admin
+                cinder create 1
+                image=$(glance image-list|grep "cir"|awk '{print $4}')
+                nova boot --flavor m1.small --image $image vm1
+                sleep 240
                 nova list
-                echo "ERROR: Volume attach failed. Status not in-use."
-                exit 1
-            fi
-            echo "Detaching nova volume"
-            nova volume-detach $nova $cinder_vol
-            sleep 30
-            vstat=$(cinder list|grep lvmdriver-1 |awk '{print $4}')
-            if [ "$vstat" != "available" ]; then
                 cinder list
+                echo "Attaching nova volume"
+                nova=$(nova list | awk '{print $2}' | grep '-')
+                cinder_vol=$(cinder list| awk '{print $2}' | grep '-')
+
+                nova volume-attach $nova $cinder_vol
+                sleep 20
+                vstat=$(cinder list|grep lvmdriver-1 |awk '{print $4}')
                 nova list
-                echo "ERROR: Volume detach failed. Status still $vstat"
-                exit 1
-            fi
-            nova list
-            cinder list
-            sleep 60
-            echo "Deleting volume"
-            cinder delete $cinder_vol
-            sleep 60
-            c=$(cinder list | grep lvm)
-            if [ "$c" != "" ]; then
-                echo "ERROR Cinder not deleted"
                 cinder list
-                status=1
-            fi
-            echo "FINISHED: ############## $phase  ###################"
-            exit $status
+                if [ "$vstat" != "in-use" ]; then
+                   cinder list
+                   nova list
+                   echo "ERROR: Volume attach failed. Status not in-use."
+                   exit 1
+                fi
+                echo "Detaching nova volume"
+                nova volume-detach $nova $cinder_vol
+                sleep 30
+                vstat=$(cinder list|grep lvmdriver-1 |awk '{print $4}')
+                if [ "$vstat" != "available" ]; then
+                   cinder list
+                   nova list
+                   echo "ERROR: Volume detach failed. Status still $vstat"
+                   exit 1
+                fi
+                nova list
+                cinder list
+                sleep 60
+                echo "Deleting volume"
+                cinder delete $cinder_vol
+                sleep 60
+                c=$(cinder list | grep lvm)
+                if [ "$c" != "" ]; then
+                    echo "ERROR Cinder not deleted"
+                    cinder list
+                    status=1
+                fi
+                echo "FINISHED: ############## $phase status=$status ###################"
+                exit $status
 
 - builder:
     name: configure-devstack-NVMe
@@ -202,6 +246,18 @@
               export ${project^^}_BRANCH=$refspec
             fi
 
+            MLNX_PATCHES=""
+            #if [ -z $ZUUL_CHANGE ]; then
+                export MLNX_PATCHES="CINDER_BRANCH=$MLNX_CINDER_BRANCH
+            OS_BRICK_BRANCH=$MLNX_OS_BRICK_BRANCH
+            "
+            #fi
+            #elif [ $ZUUL_CHANGE != '482642' ]; then
+            #    export MLNX_PATCHES="OS_BRICK_BRANCH=$MLNX_OS_BRICK_BRANCH"
+            #elif [ [ $ZUUL_CHANGE != '505556'] ;then
+            #    export MLNX_PATCHES="CINDER_BRANCH=$MLNX_CINDER_BRANCH"
+            #fi
+
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
             DOWNLOAD_DEFAULT_IMAGES=True
@@ -210,12 +266,11 @@
             RABBIT_PASSWORD=password
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
-            SYSLOG=True
-            USE_SCREEN=False
 
             HOST_IP=$(host $(hostname) | cut -d' ' -f4)
 
             NOVA_BRANCH=$NOVA_BRANCH
+            $MLNX_PATCHES
 
             RECLONE=yes
             LOG_COLOR=False
@@ -230,7 +285,10 @@
             VOLUME_BACKING_FILE_SIZE=10250M
 
             DISABLED_SERVICES=n-net
-            ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
+            enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
+            disable_service = horizon
+            #ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
+            #disable_service=horizon
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -255,20 +313,26 @@
             enabled_backends=lvmdriver-1
 
             [lvmdriver-1]
+            image_volume_cache_enabled = True
+            volume_clear = zero
             lvm_type = default
             iscsi_helper = nvmet
-            volume_group = stack-volumes-lvmdriver-1
+            volume_group =  stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-1
-            iscsi_ip_address = 1.1.1.1
-            iscsi_port = 1023
+            nvme_target_ip = 1.1.1.1
+            nvme_target_port = 4420
             nvmet_port_id = 1
-            nvmet_ns_id = 10
+            nvmet_ns_is = 10
             target_prefix = default-subsys
 
-            [[test-config|$TEMPEST_CONFIG]]
+            [[test-config|\$TEMPEST_CONFIG]]
             [volume]
-            backend1_name = lvmdriver-1
+            backend_names = lvmdriver-1
+            [volume-feature-enabled]
+            multi_backend = False
 
+            [auth]
+            tempest_roles = Admin
             EOF
             echo "FINISHED: ############## $phase  ###################"

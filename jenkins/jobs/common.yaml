@@ -5,15 +5,9 @@
             #!/bin/bash -x
             status=0
 
-            if [ -x /usr/bin/ibdev2netdev ]; then
-                for i in $(ibdev2netdev |awk '{print $5}'); do
-                    sudo ifconfig $i up
-                done
-            fi
-
-            for i in `ifconfig -a | egrep -v "^ |^$|br|lo|ovs"|awk '{print $1}'|cut -d':' -f1`;do
-                sudo ifconfig $i up
-                sleep 1
+            for i in $(ip link |awk '{print $2}' | egrep ':$'|cut -d':' -f1)
+            do
+               sudo ip link set $i up
             done
 
             sudo killall -9 radvd 2>&1|tee > /dev/null
@@ -24,10 +18,12 @@
                 echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg"
                 exit 1
             fi
-            export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
-            export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
-            echo "Using pci=$pci pf=$pf HCA=$HCA"
-            sudo sh -c  "echo 4 > /sys/class/net/$pf/device/mlx5_num_vfs" 2>&1|tee > /dev/null
+
+            for pci in $(lspci |grep Mell |grep -v Virtual|awk '{print $1}'); do
+                for p in $(ls -l /sys/class/net/ |grep $pci|awk '{print $9}'); do
+                    sudo sh -c  "echo 4 > /sys/class/net/$p/device/mlx5_num_vfs" 2>&1|tee > /dev/null
+                done
+            done
             sudo timedatectl set-timezone 'Asia/Jerusalem'
             env
 
@@ -42,7 +38,8 @@
     builders:
         - shell: |
             #!/bin/bash -x
-            phase="COLLECT CONFIG FILES"
+            phase="******************** COLLECT CONFIG FILES *******************************"
+            echo $phase
             CI_ARTIFACTS=$LOGDIR/..
             mkdir -p $LOGDIR
             mkdir -p $CI_ARTIFACTS/etc
@@ -53,15 +50,14 @@
             [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate
             pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             cat /etc/issue|grep -i 'ubuntu'
-            if [ -z $? ]; then
+            if [ ! -z $? ]; then
                 dpkg --list|sort > $CI_ARTIFACTS/env/packages.txt
             else
                 rpm -qa| sort > $CI_ARTIFACTS/env/packages.txt
             fi
             sudo lvs > $CI_ARTIFACTS/env/lvs.txt
             env |sort > $CI_ARTIFACTS/env/environment.txt
-            ifconfig > $CI_ARTIFACTS/env/ifconfig.txt
-            ip link show >> $CI_ARTIFACTS/env/ifconfig.txt
+            ip link show > $CI_ARTIFACTS/env/iplink.txt
             sudo ovs-vsctl show > $CI_ARTIFACTS/env/ovs-vsctl.txt
             sudo lspci|grep Mellanox > $CI_ARTIFACTS/env/lspci.txt
             sudo uname -a > $CI_ARTIFACTS/env/os.txt
@@ -108,7 +104,6 @@
 - builder:
     name: clean-environment
     builders:
-        #- delete-mac-nova
         - shell: |
             #!/bin/bash -x
             phase="CLEAN-ENVIRONMENT"
@@ -132,9 +127,13 @@
 
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
-            [ ! -d $WORKSPACE/devstack/ ] && git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
-            #[ ! -d $WORKSPACE/devstack/ ] && git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
+            #[ ! -d $WORKSPACE/devstack/ ] && git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
+            [ ! -d $WORKSPACE/devstack/ ] && git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
             echo "Cleaning up possible remainings of previous builds."
+            sudo kill -9 $(ps -ef |grep python | grep neutron | awk '{print $2}')
+            sudo systemctl stop devstack@*
+            sleep 30
+            ps -ef |grep python
             $WORKSPACE/devstack/clean.sh
 
             # Remove stack screens leftovers
@@ -146,6 +145,7 @@
                 echo "Cleaning Cinder left volumes"
                 sudo lvs
                 sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
+                sudo nvmetcli clear 2>&1|tee
                 sudo service tgt stop > /dev/null 2>&1 || true
             fi
 
@@ -169,14 +169,23 @@
             sudo kill -9 `pgrep ovsdb-server`
             sudo kill -9 `pgrep ovs-vswitchd`
 
-            sudo rm -rf /usr/local/lib/python2.7/dist-packages/appdir*
+            pushd /usr/local/lib/python2.7/dist-packages/
+            sudo rm -rf $(ls -1 | grep -v pip)
+            popd
 
             cat /etc/issue|grep -i 'ubuntu'
-            if [ -z $? ]; then
+            if [ ! -z $? ]; then
                 sudo apt-get install python-docutils python-pkg-resources gnupg -y 2>&1|tee
+                sudo apt-get remove -y $(dpkg --list|grep apache2 | awk '{print $2}')
+                sudo systemctl stop httpd
+                sudo dpkg --purge $(dpkg --list|grep apache2 | awk '{print $2}')
             else
+                sudo systemctl stop httpd
+                sudo yum remove -y httpd
+                sudo rm -rf /etc/httpd
                 sudo yum install python-docutils python-pkg-resources gnupg python-requests rabbitmq-server -y 2>&1|tee
             fi
+
             sudo pip install appdirs==1.4.3
             sudo pip install setuptools
             sudo pip install pbr
@@ -185,6 +194,7 @@
             sudo pip install babel
             sudo pip install docutils
             sudo pip install oslo.privsep
+            sudo pip install requests
 
             [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
             if [[ -n $ZUUL_PROJECT ]]; then
@@ -227,14 +237,7 @@
 
             sudo rm -rf /opt/stack
             env
-            sudo journalctl --vacuum-time=0
-            sudo journalctl --vacuum-size=0
-            sudo systemctl restart systemd-journald
-
-            # Delete temporal interfaces
-            #for i in $(ifconfig -a | egrep "^q" | awk '{print $1}' | cut -d':' -f1); do
-            #    sudo ip link delete $i
-            #done
+            sudo journalctl --vacuum-time=1seconds
             echo "FINISHED:############## $phase  ###################"
 
 - builder:
@@ -276,6 +279,22 @@
             sudo modprobe ib_isert 2>&1|tee > /dev/null
             sudo modprobe ib_iser 2>&1|tee > /dev/null
 
+- builder:
+    name: apply-workarounds-post-stack-Nova-ML2-Sriov-Multinode-Compute
+    builders:
+        - shell: |
+            #!/bin/bash -xE
+            phase="APPLY-WORKAROUNDS-POST"
+            echo "STARTED: ############## $phase  ###################"
+
+- builder:
+    name: apply-workarounds-post-stack-Nova-ML2-Sriov-Multinode-Controller
+    builders:
+        - shell: |
+            #!/bin/bash -xE
+            phase="APPLY-WORKAROUNDS-POST"
+            echo "STARTED: ############## $phase  ###################"
+
 
 - builder:
     name: apply-workarounds-tempest
@@ -310,13 +329,6 @@
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
-          if [ $ZUUL_BRANCH == 'stable/newton' ]; then
-              export MLNX_DRIVER='mlnx'
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          else
-              export MLNX_DRIVER='mlnx_infiniband'
-          fi
-          echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
@@ -338,9 +350,8 @@
           MYSQL_PASSWORD=password
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
-          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          HOST_IP=$(hostname -i)
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -358,7 +369,7 @@
           SERVICE_TOKEN=servicetoken
           # Neutron
           Q_PLUGIN=ml2
-          Q_ML2_PLUGIN_MECHANISM_DRIVERS=${MLNX_DRIVER},openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=mlnx_infiniband,openvswitch
           Q_AGENT=openvswitch
           Q_USE_DEBUG_COMMAND=False
           Q_USE_SECGROUP=True
@@ -374,9 +385,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-xvnc n-novnc
           enable_service eswitchd
           enable_service mlnx-agt mlnx_dnsmasq
           enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
@@ -386,8 +396,6 @@
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
-          #should be removed after newton
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
@@ -428,9 +436,6 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -442,8 +447,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -475,9 +479,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -526,9 +529,6 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          fi
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -540,8 +540,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -573,9 +572,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -622,14 +620,6 @@
 
           echo "NETWORKING_MLNX_BRANCH=$NETWORKING_MLNX_BRANCH"
 
-          if [ "$ZUUL_BRANCH" == 'stable/newton' ]; then
-              export MLNX_DRIVER='sdnmechdriver,mlnx'
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          else
-              export MLNX_DRIVER='mlnx_sdn_assist,mlnx_infiniband'
-          fi
-
-          echo "MLNX_DRIVER=$MLNX_DRIVER"
           HCA=${HCA:-"mlx4"}
           mlx=`echo $HCA | sed s/mlx//g`
           let mlx=mlx-1
@@ -651,8 +641,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(hostname -i)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -670,7 +659,7 @@
           SERVICE_TOKEN=servicetoken
           # Neutron
           Q_PLUGIN=ml2
-          Q_ML2_PLUGIN_MECHANISM_DRIVERS=${MLNX_DRIVER},openvswitch
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=mlnx_sdn_assist,mlnx_infiniband,openvswitch
           Q_AGENT=openvswitch
           Q_USE_DEBUG_COMMAND=False
           Q_USE_SECGROUP=True
@@ -686,11 +675,9 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt
-          enable_service eswitchd
-          enable_service mlnx-agt mlnx_dnsmasq
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt n-xvnc n-novnc
+          enable_service mlnx-agt mlnx_dnsmasq eswitchd
           enable_plugin neutron_ml2_mlnx git://github.com/openstack/networking-mlnx ${NETWORKING_MLNX_BRANCH}
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -744,9 +731,6 @@
               exit 1
           fi
 
-          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          fi
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -758,8 +742,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -792,9 +775,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -842,9 +824,6 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          fi
 
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -857,8 +836,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -890,9 +868,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -916,8 +893,6 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
-
-
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -939,9 +914,6 @@
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
-          if [[ $ZUUL_BRANCH == "stable/newton" ]]; then
-              export REQUIREMENTS_BRANCH=refs/changes/64/491464/1
-          fi
 
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -954,8 +926,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=True
-          USE_SCREEN=False
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -987,9 +958,8 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          disable_service n-xvnc n-novnc horizon
-          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
+          disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
@@ -1013,7 +983,9 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
-
+          [compute-feature-enabled]
+          suspend=false
+          resize=false
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1035,7 +1007,7 @@
               exit 1
           fi
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
-          export CONTROLLER_NODE=${CONTROLLER_NODE:-"cloudx-27"}
+          export CONTROLLER_NODE=${CONTROLLER_NODE:-"10.224.33.57"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -1045,8 +1017,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=False
-          USE_SCREEN=True
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1088,24 +1059,15 @@
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
 
-          #enable_service n-cpu q-agt n-api-meta n-novnc n-xvnc q-sriov-agt
-          #ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api,n-cond
-          #enable_plugin neutron $NEUTRON_REPO
-          #disable_service tempest n-cauth c-vol etcd3
-          #enable_service n-cpu q-agt n-api-meta n-novnc n-xvnc q-sriov-agt placement-api
-
-          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-api
+          ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-client
           enable_plugin neutron $NEUTRON_REPO
           disable_service tempest n-cauth c-vol etcd3
 
-
-
-
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
+          enabled_apis = osapi_compute
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
@@ -1142,6 +1104,8 @@
           fi
 
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
+          export HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -1155,8 +1119,7 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          SYSLOG=False
-          USE_SCREEN=True
+          PIP_UPGRADE=yes
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1188,17 +1151,14 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service horizon h-eng h-api h-api-cfn h-api-cw c-vol etcd3
-          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc
+          disable_service h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
+          enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc placement-api
           enable_plugin neutron $NEUTRON_REPO
-          #LNY
-          # placement-api q-qos
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
-          pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
@@ -1250,7 +1210,6 @@
               export ${project^^}_BRANCH=$refspec
           fi
 
-          date +"%Y-%m-%d %H:%M:%S" > /tmp/stack_started.txt
           BUILD_ID=dontKillMe $WORKSPACE/devstack/stack.sh
           rc=$?
 
@@ -1270,13 +1229,14 @@
     builders:
       - shell: |
           #!/bin/bash -x
+          LOGDIR=${LOGDIR:-/opt/stack/logs}
           CI_ARTIFACTS=$(dirname ${LOGDIR})/logs
           echo "Saving SYSLOG files to $CI_ARTIFACTS"
           mkdir -p $CI_ARTIFACTS
           for s in $(systemctl list-unit-files| grep devstack | awk '{print $1}')
           do
               echo "saving $s in $CI_ARTIFACTS/$s.log"
-              sudo journalctl -o short-precise --unit $s -S "$(cat /tmp/stack_started.txt)" > $CI_ARTIFACTS/$s.log
+              sudo journalctl -o short-precise --unit $s > $CI_ARTIFACTS/$s.log
           done
 
 
@@ -1290,6 +1250,7 @@
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
              $WORKSPACE/devstack/unstack.sh 2>&1|tee
           fi
+          sudo nvmetcli clear 2>&1|tee
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1562,8 +1523,9 @@
             echo "STARTED: ############## $phase  ###################"
             tests=(
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
-                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration_revert
-                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration
+                  #TOFIX
+                  #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration_revert
+                  #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration
             )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
@@ -1819,66 +1781,3 @@
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
           echo "FINISHED: ############## $phase  ###################"
-
-
-- builder:
-    name: add-mac-nova
-    builders:
-        - shell: |
-            #!/bin/bash
-            #Prepare  environment
-            exit 0
-            phase="ADD-MAC-NOVA"
-            if [[ "$ZUUL_BRANCH" == "master" || -z "$ZUUL_BRANCH" ]]; then
-                exit 0
-            fi
-
-            echo "STARTED: ############## $phase  ###################"
-            WORKSPACE=${WORKSPACE:-$(dirname `readlink -f -- $0`)}
-            echo "WORKSPACE=$WORKSPACE"
-
-            source $WORKSPACE/devstack/openrc admin
-
-            # Start script to add macs to default gateway
-            echo "NOVA CI add macs"
-            ADD_MAC='/tmp/add_mac.sh'
-            HCA=${HCA:-"mlx4"}
-            mlnx_port=`ibdev2netdev |grep $HCA|grep Up | awk '{print $5}' | head -n1`
-            echo "Adding macs to $HCA:$mlnx_port"
-
-            cat <<EOF > $ADD_MAC
-            #!/bin/bash
-            #This script adds MACs to the physical interface
-            while [ 1 ]; do
-                macs=\`neutron port-list |awk '{print \$5}' |grep fa |egrep -v "\"10.0|\"172."\`
-                for mac in \$macs; do
-                    sudo bridge fdb add \$mac dev $mlnx_port
-                    done
-                done
-            EOF
-            nohup bash $ADD_MAC 2>&1|tee > /dev/null &
-            cp $ADD_MAC ${WORKSPACE}/
-            echo "FINISHED: ############## $phase  ###################"
-
-- builder:
-    name: delete-mac-nova
-    builders:
-        - shell: |
-            #!/bin/bash
-            exit 0
-            phase="DELETE_MAC_NOVA"
-            echo "STARTED: ############## $phase  ###################"
-            ADD_MAC='/tmp/add_mac.sh'
-            HCA=${HCA:-"mlx4"}
-            echo "NOVA CI clean macs"
-            kill -9 $(ps -ef |grep add_mac | grep -v grep | awk '{print $2}') 2>&1|tee > /dev/null
-            rm -f $ADD_MAC 2>&1|tee > /dev/null
-
-            mlnx_port=`ibdev2netdev |grep $HCA|grep Up | awk '{print $5}' | head -n1`
-            echo "Removing macs from $HCA:$mlnx_port"
-
-            tmp_file="/tmp/del_macs_$$"
-            sudo bridge fdb show |grep fa:16 | awk '{print "sudo bridge fdb del " $1 " dev " $3}' > $tmp_file
-            bash -x $tmp_file 2>&1|tee > /dev/null
-            rm -f $tmp_file
-            echo "FINISHED: ############## $phase  ###################"
