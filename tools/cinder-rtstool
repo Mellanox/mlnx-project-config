@@ -308,13 +308,13 @@ def set_target_attribute(target_name, attribute, value):
 def get_target_parameters(target_name):
     rtsroot = rtslib.root.RTSRoot()
     for x in rtsroot.targets:
-        if x.wwn ==  target_name:  
+        if x.wwn ==  target_name:
             return x.list_parameters()
 
 def get_target_attributes(target_name):
     rtsroot = rtslib.root.RTSRoot()
     for x in rtsroot.targets:
-        if x.wwn ==  target_name:  
+        if x.wwn ==  target_name:
             return x.list_attributes()
 
 def set_tpg_attribute(target_name, attribute, value, tpg_tag = 0):
@@ -420,7 +420,7 @@ def get_tpg_parameter_value(target_name, parameter, tpg_tag = 0 ):
         except rtslib.utils.RTSLibError:
             print('Error getting parameter %s  value for target %s ' % \
                   (parameter, target_name) )
-            raise    
+            raise
     else:
         print "Get TPG Parameter: TPG object not found"
     return param_value
@@ -545,7 +545,7 @@ def main(argv=None):
             initiator_iqns = argv[15]
 
         if backing_device.startswith("null"):
-            backing_device = "/dev/" + backing_device 
+            backing_device = "/dev/" + backing_device
 
         create(backing_device, dev_name, name, transport, userid, password, \
 			   host_ips, port, backend_type, disk_size, signature, \

@@ -166,15 +166,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27710
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
             CINDER_PROTOCOL=tgtadm
       - check-environment
@@ -217,12 +217,12 @@
             HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -265,12 +265,12 @@
             HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -311,7 +311,6 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             SIMX_SNAPSHOT=Simx2.4-2359_20170214
@@ -346,15 +345,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=27710
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             CINDER_PROTOCOL=lioadm
             FORCE=yes
       - check-environment
@@ -501,13 +500,6 @@
       - shell: |
                 #!/bin/bash +ex
 
-                HCA=${HCA:-"mlx4"}
-                mlx=`echo $HCA | sed s/mlx//g`
-                let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-
-                sudo ifconfig $mlnx_port 1.1.1.1/16 up
-
                 echo "============ Starting tempest tests ====================="
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
@@ -536,13 +528,6 @@
     builders:
       - shell: |
                 #!/bin/bash +ex
-
-                HCA=${HCA:-"mlx4"}
-                mlx=`echo $HCA | sed s/mlx//g`
-                let mlx=mlx-1
-                export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"| grep Up| awk '{print $5}'|tail -n1`
-
-                sudo ifconfig $mlnx_port 1.1.1.1/16 up
 
                 echo "============ Starting tempest tests ====================="
                 tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes

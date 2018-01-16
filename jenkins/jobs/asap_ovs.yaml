@@ -75,17 +75,19 @@
     builders:
       - shell: |
           #!/bin/bash -ex
-          phase="CONFIGURE-DEVSTACK-Multinode-Controller"
+          phase="CONFIGURE-DEVSTACK"
           echo "STARTED: ############## $phase  ###################"
 
           export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
           export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
           echo "pci=$pci, pf=$pf"
           if [ -z "$ZUUL_PROJECT" ] || [ "$ZUUL_PROJECT" == 'openstack/os-vif' ]; then
-              export NEUT="NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
-          else
-              export NEUT="#NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
+              export TEMP="TEMPEST_BRANCH=$MLNX_TEMPEST_BRANCH"
+          elif [ "$ZUUL_PROJECT" == 'openstack/tempest' ] && [ "$ZUUL_CHANGE" != "499575" ]; then
+              export TEMP="TEMPEST_BRANCH=$MLNX_TEMPEST_BRANCH"
           fi
+          export NEUT="NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -101,8 +103,7 @@
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
 
           $NEUT
-          NOVA_BRANCH=refs/changes/13/505613/12
-          TEMPEST_BRANCH=refs/changes/75/499575/3
+          $TEMP
 
           LIBS_FROM_GIT=os-vif,neutron-lib
           Q_BUILD_OVS_FROM_GIT=True
@@ -151,6 +152,7 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
+          port_profile = capabilities:[switchdev]
           [network-feature-enabled]
           api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network
           [compute-feature-enabled]
@@ -159,7 +161,6 @@
           [auth]
           tempest_roles = Admin
           EOF
-
           echo "FINISHED: ############## $phase  ###################"
 
 - project:
@@ -215,7 +216,9 @@
             IMAGE_SERVER=52.169.200.208
             HCA=MT27710
             PATH=$PATH:/usr/sbin
-            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/4
+            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/5
+            MLNX_TEMPEST_BRANCH=refs/changes/75/499575/8
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -248,8 +251,9 @@
             IMAGE_SERVER=52.169.200.208
             HCA=MT27710
             PATH=$PATH:/usr/sbin
-            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/4
-            #OVS_BRANCH="master"
+            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/5
+            MLNX_TEMPEST_BRANCH=refs/changes/75/499575/6
+            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment

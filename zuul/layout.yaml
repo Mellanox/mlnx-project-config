@@ -122,25 +122,25 @@ pipelines:
 #        verified: 0
 
 
-#  - name: check-sriov-tempest
-#    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
-#    failure-message: Build failed. To re-run the job please post a comment with 'recheck tempest-mlnx'.
-#    footer-message: To re-run the job post 'recheck tempest-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
-#    manager: IndependentPipelineManager
-#    precedence: low
-#    trigger:
-#      gerrit:
-#        - event: patchset-created
-#        - event: change-restored
-#        - event: comment-added
-#          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( tempest-mlnx))\s*$
-##Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: 0
+  - name: check-sriov-tempest
+    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
+    failure-message: Build failed. To re-run the job please post a comment with 'recheck tempest-mlnx'.
+    footer-message: To re-run the job post 'recheck tempest-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
+    manager: IndependentPipelineManager
+    precedence: low
+    trigger:
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( tempest-mlnx))\s*$
+#Remark for silent mode
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: 0
 
   - name: check-networking-mlnx
     description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
@@ -205,12 +205,12 @@ pipelines:
         - event: comment-added
           comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( os-vif-mlnx))\s*$
 #Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: 0
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: 0
     merge-failure:
       smtp:
         to: openstack_ci@mellanox.com
@@ -240,7 +240,6 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
-#          - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
   - name: Neutron-MACVTAP-ML2-Sriov
     branch: ^(master|stable/ocata|stable/pike).*$
@@ -263,7 +262,6 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
-#          - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
 
   - name: Neutron-ML2-MLNX
@@ -287,7 +285,6 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
-#          - ^neutron/plugins/ml2/drivers/mech_sriov/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/brocade/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/freescale/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/hyperv/.*$
@@ -299,9 +296,8 @@ jobs:
           - ^neutron/tests/unit/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/ovsvapp/.*$
-#          - ^neutron/tests/unit/plugins/ml2/drivers/mech_sriov/.*$
-#
-#
+
+
   - name: Neutron-Networking-MLNX-ML2
     branch: ^(master|stable/ocata|stable/pike).*$
     voting: true
@@ -422,7 +418,7 @@ projects:
   - name: openstack/networking-mlnx
     check-networking-mlnx:
       - Neutron-Networking-MLNX-ML2
-      - Neutron-ML2-MLNX
+      #- Neutron-ML2-MLNX
   - name: openstack/nova
     check-mlnx-multinode:
       - Nova-ML2-Sriov-Multinode
@@ -435,7 +431,6 @@ projects:
 
   - name: openstack/cinder
     check-cinder:
-#      - NVMe
       - Cinder-ISER-ISCSI
       - Cinder-ISER-LIO
   - name: openstack/os-brick
@@ -444,16 +439,10 @@ projects:
       - Cinder-ISER-ISCSI
       - Cinder-ISER-LIO
 
-
-
-# Currently commented since all tempest code is merged
-#  - name: openstack/tempest
-#    check-sriov-tempest:
-#      - Nova-ML2-Sriov-Multinode
-
-#  - name: openstack/tempest
-#    check-sriov-tempest:
-#      - Tempest-Sriov
+  - name: openstack/tempest
+    check-sriov-tempest:
+      - OVS_HW_offload
+      - Tempest-Sriov
 
 #  - name: openstack/ironic
 #    check-ironic-ib:

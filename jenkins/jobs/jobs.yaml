@@ -7,15 +7,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -53,15 +53,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -98,15 +98,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -144,15 +144,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -188,15 +188,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -234,15 +234,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -254,6 +254,7 @@
       - apply-workarounds-post-stack
       #- run-tests-neutron
       #- 'run-tests-{name}-API'
+      #- run-tests-network-add
       - run-tests-network-basic
       - run-tests-network-advanced
       - produce-readme-file
@@ -281,16 +282,16 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -326,16 +327,16 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - mlnx-project-config
       - noop-run
@@ -381,11 +382,11 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
-              - name: Tempest-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+              #- name: Tempest-Sriov
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/pike
+              #     FORCE=yes
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
@@ -438,7 +439,7 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/2
               #- name: Nova-ML2-Sriov-Multinode
               #  current-parameters: true
               #  predefined-parameters: |
@@ -449,19 +450,19 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
-              - name: Tempest-Sriov
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/ocata
-                   FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/2
+              #- name: Tempest-Sriov
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/ocata
+              #     FORCE=yes
+              #     REQUIREMENTS_BRANCH=refs/changes/91/507391/1
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/ocata
                    FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/91/507391/1
+                   REQUIREMENTS_BRANCH=refs/changes/91/507391/2
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
@@ -520,8 +521,8 @@
                 current-parameters: true
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
-              #- name: NVMe
-              #  current-parameters: true
+              - name: NVMe
+                current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
               - name: Neutron-MACVTAP-ML2-Sriov
@@ -551,16 +552,16 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            REQUIREMENTS_REPO=/home_stack/git/requirements
+            HORIZON_REPO=/home_stack/git/horizon
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -591,17 +592,17 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            REQUIREMENTS_REPO=/home_stack/git/requirements
+            TEMPEST_REPO=/home_stack/git/tempest
+            HORIZON_REPO=/home_stack/git/horizon
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -631,17 +632,17 @@
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            REQUIREMENTS_REPO=git://git.openstack.org/openstack/requirements
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
+            CINDER_REPO=/home_stack/git/cinder
+            GLANCE_REPO=/home_stack/git/glance
+            NEUTRON_REPO=/home_stack/git/neutron
+            KEYSTONE_REPO=/home_stack/git/keystone
+            REQUIREMENTS_REPO=/home_stack/git/requirements
+            HORIZON_REPO=/home_stack/git/horizon
+            NOVA_REPO=/home_stack/git/nova
       - mlnx-project-config
       - run-tests-multinode
       - stop-stacksh
@@ -666,7 +667,7 @@
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx4
+            HCA=MT27520
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE

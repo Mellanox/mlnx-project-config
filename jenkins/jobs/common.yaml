@@ -1,10 +1,10 @@
 - builder:
     name: check-environment
     builders:
+        - clone-git
         - shell: |
             #!/bin/bash -x
             status=0
-
             for i in $(ip link |awk '{print $2}' | egrep ':$'|cut -d':' -f1)
             do
                sudo ip link set $i up
@@ -14,9 +14,9 @@
             sudo losetup -a
 
             sudo cat /proc/cmdline |grep intel_iommu
-            if [ -z $? ]; then
-                echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg"
-                exit 1
+            if [ "$?" != "0" ]; then
+                echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg and run grub-mkconfig"
+                #exit 1
             fi
 
             for pci in $(lspci |grep Mell |grep -v Virtual|awk '{print $1}'); do
@@ -29,6 +29,16 @@
 
             git config --global user.email lennyb@mellanox.com
             git config --global  user.name "Lenny Verkhovsky"
+            HCA=${HCA:-'Mellanox'}
+            echo "lspci |grep Virtual|egrep \"$HCA\" |head -n1|awk '{print $1}'"
+            export mlnx_dev=$(lspci |egrep "$HCA" |head -n1|awk '{print $1}'|cut -d'.' -f1)
+            export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
+            echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
+            if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
+                echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
+            #    exit 1
+            fi
+
 
             echo "Environment is OK"
 
@@ -97,7 +107,8 @@
                 fi
                 popd
             done
-
+            echo "$ZUUL_BRANCH" > $CI_ARTIFACTS/env/zuul_branch
+            echo "$ZUUL_BRANCH" > $WORKSPACE/../zuul_branch
             exit 0
 
 
@@ -114,9 +125,17 @@
             echo "Deleting archives older than 10 days from /var/log"
             sudo rm -f `sudo find /var/log -name *.gz`
 
-            rm -rf ~/.cache/*
-            sudo rm -rf /root/.cache/pip
-            sudo rm -rf /var/cache/apt
+            if [ -f $WORKSPACE/../zuul_branch ];then
+                zuul=$(cat $WORKSPACE/../zuul_branch)
+                ZUUL_BRANCH=${ZUUL_BRANCH:-master}
+                if [[ ! "$zuul" == "$ZUUL_BRANCH" ]]; then
+                   echo "Deleting cache since current and previous branchs are different $zuul $ZUUL_BRANCH"
+                   rm -rf ~/.cache/*
+                   sudo rm -rf /root/.cache/pip
+                   sudo rm -rf /var/cache/apt
+                fi
+            fi
+
             sudo sh -c "> /var/log/conntrackd-stats.log"
             sudo sh -c "> /var/log/libvirt/libvirtd.log"
             sudo rm -f `sudo find /var/log -name *.log.*`
@@ -127,13 +146,13 @@
 
             [ -f /opt/stack/tempest/tempest.log ] && rm -f /opt/stack/tempest/tempest.log
 
-            #[ ! -d $WORKSPACE/devstack/ ] && git clone git://git.openstack.org/openstack-dev/devstack $WORKSPACE/devstack
-            [ ! -d $WORKSPACE/devstack/ ] && git clone ssh://cloudx-17/images/openstack/devstack $WORKSPACE/devstack
+            [ ! -d $WORKSPACE/devstack/ ] && git clone /home_stack/git/devstack $WORKSPACE/devstack
+            #[ ! -d $WORKSPACE/devstack/ ] && git clone https://github.com/openstack-dev/devstack.git $WORKSPACE/devstack
             echo "Cleaning up possible remainings of previous builds."
+
             sudo kill -9 $(ps -ef |grep python | grep neutron | awk '{print $2}')
-            sudo systemctl stop devstack@*
-            sleep 30
-            ps -ef |grep python
+            sudo systemctl stop devstack*
+            sleep 20
             $WORKSPACE/devstack/clean.sh
 
             # Remove stack screens leftovers
@@ -212,20 +231,8 @@
                 done
             done
 
-            #echo killing all python procs
-            retries=10
-            delay=10
-            ps -ef |grep /usr/bin/python |grep -v grep |grep -v ipoibd
-            pid=$?
-            while [[ $retries -gt 0 ]] && [[ $pid -eq 0 ]]; do
-                sleep $delay
-                for pid in `ps -ef |grep /usr/bin/python |grep -v grep |grep -v ipoibd |awk '{print $2}'`; do
-                    sudo kill $pid
-                done
-                ps -ef |grep /usr/bin/python |grep -v grep
-                pid=$?
-                let retries=retries-1
-            done
+            sudo kill -9 $(ps -ef |grep python|grep -v grep| grep -v ipoibd)
+            for i in $(ifconfig -a|egrep "^q" | cut -d':' -f1); do sudo ip link delete $i; done
 
             echo "Check if ipoibd is running"
             ipoibd=`pgrep ipoibd`
@@ -238,6 +245,8 @@
             sudo rm -rf /opt/stack
             env
             sudo journalctl --vacuum-time=1seconds
+            sudo systemctl restart systemd-journald
+            sudo systemctl restart libvirtd 2>&1|tee
             echo "FINISHED:############## $phase  ###################"
 
 - builder:
@@ -329,15 +338,11 @@
           fi
 
           ZUUL_BRANCH=${ZUUL_BRANCH:-'master'}
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up| grep ib| awk '{print $5}'|tail -n1`
-          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| awk '{print $5}'|head -n1`
-          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| grep ib| head -n1)
+          export epioib_port=$(ibdev2netdev  | grep mlx4_0 | grep Up| awk '{print $5}'|head -n1)
+          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
-              echo "One of the critical params not found"
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
@@ -381,6 +386,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:10
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$epioib_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
@@ -406,6 +412,7 @@
           [compute-feature-enabled]
           suspend=false
           resize=false
+          interface_attach = False
           [network]
           port_vnic_type=direct
           [network-feature-enabled]
@@ -415,6 +422,8 @@
           [compute]
           flavor_ref=2
           flavor_ref_alt=2
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -425,12 +434,8 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Neutron-ML2-Sriov"
           echo "STARTED: ############## $phase  ###################"
-          echo $PATH
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -475,6 +480,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
@@ -482,6 +488,7 @@
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
 
@@ -505,9 +512,13 @@
           [network]
           port_vnic_type=macvtap
           [network-feature-enabled]
-          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,network,qos,security-group
+          #port-security
           [compute-feature-enabled]
           resize=false
+          interface_attach = False
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -518,12 +529,8 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Neutron-ML2-Sriov"
           echo "STARTED: ############## $phase  ###################"
-          echo $PATH
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -568,6 +575,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
@@ -575,6 +583,7 @@
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
           enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
 
@@ -597,7 +606,11 @@
           [network]
           port_vnic_type=direct
           [network-feature-enabled]
-          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network,qos
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,network,qos,security-group
+          #port-security
+          [validation]
+          ssh_timeout = 300
+          ping_timeout = 400
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -619,18 +632,15 @@
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
 
           echo "NETWORKING_MLNX_BRANCH=$NETWORKING_MLNX_BRANCH"
-
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"|grep Up| awk '{print $5}'|tail -n1`
-          export epioib_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" |grep Up| awk '{print $5}'|head -n1`
-          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port epioib_port=$epioib_port"
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| grep ib|head -n1)
+          export epioib_port=$(ibdev2netdev  | grep mlx4_0 | grep Up| awk '{print $5}'|head -n1)
+          echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
+
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
           DOWNLOAD_DEFAULT_IMAGES=False
@@ -671,6 +681,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:10
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$epioib_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
@@ -700,6 +711,7 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           resize=false
+          interface_attach = False
           [network]
           port_vnic_type=direct
           [network-feature-enabled]
@@ -709,7 +721,8 @@
           [compute]
           flavor_ref=2
           flavor_ref_alt=2
-
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -720,11 +733,8 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Nova-MACVTAP-ML2-Sriov"
           echo "STARTED: ############## $phase  ###################"
-          HCA=${HCA:-"mlx5"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell| grep Virtual| grep "\-$mlx" |head -n1|awk '{print $1}' | cut -d'.' -f1`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -771,19 +781,21 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
-          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          scheduler_available_filters=nova.scheduler.filters.all_filters
+          #scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
@@ -802,7 +814,9 @@
           port_vnic_type=macvtap
           [compute-feature-enabled]
           resize=false
-
+          interface_attach = False
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -814,16 +828,16 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Nova-ML2-Sriov"
           echo "STARTED: ############## $phase  ###################"
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1"| grep Up|awk '{print $5}'|tail -n1`
+          HCA=${HCA:-'Mellanox'}
+          echo "lspci |grep Virtual|egrep $HCA |head -n1|awk '{print $1}'"
+          export mlnx_dev=$(lspci |grep Virtual|egrep "$HCA" |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
+
 
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -864,19 +878,21 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
-          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          scheduler_available_filters=nova.scheduler.filters.all_filters
+          #scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
@@ -893,6 +909,8 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -904,11 +922,9 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Tempest-Sriov"
           echo "STARTED: ############## $phase  ###################"
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep "port 1" | grep Up|awk '{print $5}'|tail -n1`
+          HCA=${HCA:-'Mellanox'}
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -954,19 +970,21 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos n-xvnc n-novnc
-          enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH
+          enable_plugin neutron git://git.openstack.org/openstack/neutron $NEUTRON_BRANCH
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           # Optional, to enable tempest configuration as part of devstack
           enable_service tempest
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          scheduler_available_filters=nova.scheduler.filters.all_filters
+          #scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           pci_passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
           [pci]
@@ -986,6 +1004,9 @@
           [compute-feature-enabled]
           suspend=false
           resize=false
+          interface_attach = False
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -996,16 +1017,14 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Multinode-Compute"
           echo "STARTED: ############## $phase  ###################"
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 | grep Up| grep "port 1" | awk '{print $5}'|tail -n1`
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
               exit 1
           fi
+
           export NEUTRON_REPO=${NEUTRON_REPO:-git://git.openstack.org/openstack/neutron}
           export CONTROLLER_NODE=${CONTROLLER_NODE:-"10.224.33.57"}
           cat > $WORKSPACE/devstack/local.conf <<EOF
@@ -1045,6 +1064,7 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           SERVICE_HOST=$CONTROLLER_NODE
           MYSQL_HOST=$CONTROLLER_NODE
@@ -1060,13 +1080,14 @@
           # Services
 
           ENABLED_SERVICES=n-cpu,q-agt,n-api-meta,n-novnc,n-xvnc,q-sriov-agt,placement-client
-          enable_plugin neutron $NEUTRON_REPO
+          enable_plugin neutron git://git.openstack.org/openstack/neutron
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
           disable_service tempest n-cauth c-vol etcd3
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
           enabled_apis = osapi_compute
-          scheduler_available_filters=nova.scheduler.filters.all_filters
+          #scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
@@ -1092,11 +1113,8 @@
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK-Multinode-Controller"
           echo "STARTED: ############## $phase  ###################"
-          HCA=${HCA:-"mlx4"}
-          mlx=`echo $HCA | sed s/mlx//g`
-          let mlx=mlx-1
-          export mlnx_dev=`lspci |grep Mell|grep "\-$mlx" |head -n1|awk '{print $1}' |  sed s/\.0\$//g`
-          export mlnx_port=`ibdev2netdev  | grep ${HCA}_0 |grep "port 1"|grep Up| awk '{print $5}'|tail -n1`
+          export mlnx_dev=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}'| cut -d'.' -f1)
+          export mlnx_port=$(ls -l /sys/class/net/| grep $mlnx_dev|awk '{print $9}'| head -n1)
           echo "HCA=$HCA, mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
           if [ -z "$mlnx_dev" ] || [ -z "$mlnx_port" ]; then
               echo "mlnx_dev=$mlnx_dev mlnx_port=$mlnx_port"
@@ -1147,17 +1165,19 @@
           PHYSICAL_INTERFACE=${mlnx_port}
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
+          #port-security
           OVS_PHYSICAL_BRIDGE=br-$mlnx_port
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
           disable_service h-eng h-api h-api-cfn h-api-cw c-vol etcd3 horizon
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta q-sriov-agt tempest n-novnc n-xvnc placement-api
-          enable_plugin neutron $NEUTRON_REPO
+          enable_plugin neutron git://git.openstack.org/openstack/neutron
+          enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin.git
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
-          scheduler_available_filters=nova.scheduler.filters.all_filters
+          #scheduler_available_filters=nova.scheduler.filters.all_filters
           scheduler_default_filters = RetryFilter, AvailabilityZoneFilter, RamFilter, ComputeFilter, ComputeCapabilitiesFilter, ImagePropertiesFilter, PciPassthroughFilter
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"${mlnx_dev}"'.*"'","'"physical_network"'":"'"default"'"}
@@ -1174,11 +1194,13 @@
           [[test-config|\$TEMPEST_CONFIG]]
           [compute-feature-enabled]
           migrate=True
+          interface_attach = False
           [compute]
           min_compute_nodes=2
           [network]
           port_vnic_type=direct
-
+          [validation]
+          ssh_timeout = 300
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1191,14 +1213,13 @@
           phase="EXTERNAL-TESTING-CHECKOUT"
           echo "STARTED: ############## $phase  ###################"
           [ -d $WORKSPACE/mlnx-project-config ] && rm -rf $WORKSPACE/mlnx-project-config
-
-          #git clone ssh://cloudx-17/images/openstack/mlnx-project-config $WORKSPACE/mlnx-project-config
           git clone https://github.com/Mellanox/mlnx-project-config.git $WORKSPACE/mlnx-project-config
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
     name: run-stacksh
     builders:
+      - delete-fdb
       - shell: |
           #!/bin/bash -x
           phase="RUN-STACKSH"
@@ -1217,8 +1238,10 @@
               echo "FINISHED with ERROR $rc: ############## $phase  ###################"
               exit $rc
           fi
+          sleep 20
           . $WORKSPACE/devstack/openrc admin
           nova-manage cell_v2 discover_hosts
+          sleep 20
           nova hypervisor-list
           echo "############## Stack is up and running ###################"
           echo "FINISHED: ############## $phase  ###################"
@@ -1233,6 +1256,7 @@
           CI_ARTIFACTS=$(dirname ${LOGDIR})/logs
           echo "Saving SYSLOG files to $CI_ARTIFACTS"
           mkdir -p $CI_ARTIFACTS
+          sudo systemctl status devstack\* > $CI_ARTIFACTS/devstack_services_status.log
           for s in $(systemctl list-unit-files| grep devstack | awk '{print $1}')
           do
               echo "saving $s in $CI_ARTIFACTS/$s.log"
@@ -1246,6 +1270,7 @@
       - shell: |
           #!/bin/bash -x
           phase="STOP-STACKSH"
+          sudo systemctl stop devstack\*
           echo "STARTED: ############## $phase  ###################"
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
              $WORKSPACE/devstack/unstack.sh 2>&1|tee
@@ -1316,6 +1341,25 @@
             #!/bin/bash
             phase="RUN-TESTS-NEUTRON-ML2-MLNX"
             echo "STARTED: ############## $phase  ###################"
+
+            tests=(
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_pause_unpause
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_reboot
+                  tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_rebuild
+                  #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_resize
+                  #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_stop_start
+                  #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_suspend_resume
+                  tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
+                  #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_hotplug_nic
+                  #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_mtu_sized_frames
+                  tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
+                  #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_port_security_macspoofing_port
+                  tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                  tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_router_rescheduling
+                  #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_subnet_details
+                  #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_instance_port_admin_state
+                  tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
+             )
             tests=(tempest.api.network.admin.test_dhcp
                 tempest.api.network.admin.test_agent
                 tempest.api.network.test_floating_ips
@@ -1330,6 +1374,8 @@
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_pause_unpause
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_reboot
             )
+
+
             cd /opt/stack/tempest
             testr list-tests ${tests[@]}
             testr init
@@ -1337,6 +1383,8 @@
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
             testr run ${tests[@]}
+            #testr run tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_reboot
+            #testr run tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_pause_unpause
             test_pass=$?
             deactivate
             if [[ $test_pass -ne 0 ]]; then
@@ -1405,11 +1453,12 @@
             #!/bin/bash
             phase="RUN-TESTS-NEUTRON-NETWORKING-MLNX-ML2"
             echo "STARTED: ############## $phase  ###################"
-            tests=(tempest.api.network.admin.test_dhcp
-                tempest.api.network.admin.test_agent
-                tempest.api.network.test_floating_ips
-                tempest.api.network.test_networks
-                tempest.api.network.test_extensions
+            tests=(
+                #tempest.api.network.admin.test_dhcp
+                #tempest.api.network.admin.test_agent
+                #tempest.api.network.test_floating_ips
+                #tempest.api.network.test_networks
+                #tempest.api.network.test_extensions
                 #tempest.scenario.test_network_basic_ops
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_connectivity_between_vms_on_different_networks
                 #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_network_basic_ops
@@ -1420,6 +1469,9 @@
                 tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_reboot
                 tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_rebuild
                 tempest.scenario.test_network_advanced_server_ops.test_server_connectivity_resize
+                tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_preserve_preexisting_port
+                #neutron.tests.tempest.scenario.test_basic
+                #neutron.tests.tempest.scenario.test_floatingip
                 )
             pushd /opt/stack/tempest
             testr list-tests ${tests[@]}
@@ -1430,6 +1482,43 @@
             testr run ${tests[@]}
             test_pass=$?
             deactivate
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-network-add
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            if [ ! -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/pike' ]; then
+                echo "Branch $ZUUL_BRANCH is not supported"
+                exit 0
+            elif [ ! -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/ocata' ]; then
+                echo "Branch $ZUUL_BRANCH is not supported"
+                exit 0
+            fi
+            exit 0
+            phase="run-tests-network-add"
+            echo "STARTED: ############## $phase  ###################"
+            #pushd /opt/stack/neutron-tempest-plugin/
+            #sudo python ./setup.py install
+            pushd /opt/stack/tempest
+            testr init
+            tests = (
+                   #depends on https://review.openstack.org/#/c/530854/ refs/changes/54/530854/1
+                   neutron_tempest_plugin.scenario.test_floatingip
+                   #No patch for direct neutron_tempest_plugin.scenario.test_basic
+                   neutron_tempest_plugin.scenario.test_basic
+                   neutron_tempest_plugin.scenario.test_portsecurity
+                   #Unstable neutron_tempest_plugin.scenario.test_floatingip.FloatingIpSeparateNetwork.test_east_west
+                   )
+            testr run ${tests[@]}
+            test_pass=$?
+
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
                 exit 1
@@ -1497,13 +1586,14 @@
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
+            status=0
             testr run ${tests[@]}
-            test_pass=$?
+            status=$?
             deactivate
 
-            if [[ $test_pass -ne 0 ]]; then
+            if [[ $status -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
-                exit 1
+                exit $status
             fi
             popd
             echo "FINISHED: ############## $phase  ###################"
@@ -1672,7 +1762,7 @@
           CI_ARTIFACTS=$(dirname ${LOGDIR})
           dmesg -T 2>&1|tee > $CI_ARTIFACTS/logs/dmesg.log
           mysql -e"show status like 'Conn%';" > $CI_ARTIFACTS/logs/mysql_connections.txt
-
+          netstat  | grep CONNEC|wc $CI_ARTIFACTS/logs/netstat_connections.txt
           echo "TGT Status"
           sudo service tgt status 2>&1 |tee
 
@@ -1770,9 +1860,9 @@
 
           [ -d $WORKSPACE/devstack ] && sudo rm -rf $WORKSPACE/devstack
 
-          git clone git://git.openstack.org/openstack-dev/devstack
+          #git clone /home_stack/git/devstack
+          git clone https://github.com/openstack-dev/devstack.git
           pushd $WORKSPACE/devstack
-
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
           git fetch
           git checkout $ZUUL_BRANCH
@@ -1781,3 +1871,71 @@
           #workaround remove old cloud.yaml to avoid keystone auth problems
           rm -rf ~/.config/openstack
           echo "FINISHED: ############## $phase  ###################"
+
+
+- builder:
+    name: clone-git
+    builders:
+      - shell: |
+          #!/bin/bash -x
+
+          dayofweek=$(date +%u)
+          if [ $dayofweek != '0' ];then
+              echo "Not Sunday no git update"
+              exit 0
+          fi
+          echo "Sunday. It's a git update date"
+
+          REPOS=(
+                     git://git.openstack.org/openstack/requirements.git
+                     git://git.openstack.org/openstack/keystone.git
+                     git://git.openstack.org/openstack/glance.git
+                     https://github.com/novnc/noVNC.git
+                     git://git.openstack.org/openstack-dev/devstack
+                     git://git.openstack.org/openstack/horizon
+                     git://git.infradead.org/users/hch/nvmetcli.git
+                     https://github.com/linux-nvme/nvme-cli.git
+                     https://github.com/agrover/configshell-fb
+                     git://git.openstack.org/openstack/keystone.git
+                     git://git.openstack.org/openstack/neutron
+                     git://git.openstack.org/openstack/cinder.git
+                     git://git.openstack.org/openstack/nova.git
+                     git://git.openstack.org/openstack/tempest.git
+                     https://github.com/Mellanox/mlnx-project-config.git
+                     git://git.infradead.org/users/hch/nvmetcli.git
+                     https://github.com/linux-nvme/nvme-cli.git
+                     https://github.com/agrover/configshell-fb
+                     https://github.com/openstack/os-vif
+          )
+          echo "Updating ${REPOS[@]}"
+
+          repo_dir=/home_stack/git
+          [ ! -d $repo_dir ] && mkdir $repo_dir
+          pushd $repo_dir
+
+          for repo in ${REPOS[@]}; do
+              git clone $repo 2>&1|tee > /dev/null
+          done
+          for repo in $(ls); do
+              l=$(echo $repo |cut -d'.' -f1)
+              pushd $l
+              git checkout ${ZUUL_BRANCH:-master}
+              git pull
+              popd
+          done
+
+
+          popd
+- builder:
+    name: delete-fdb
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="DELETE_MAC_NOVA"
+            echo "STARTED: ############## $phase  ###################"
+            echo "NOVA CI clean macs"
+            tmp_file="/tmp/del_macs_$$"
+            sudo bridge fdb show |grep fa:16 | awk '{print "sudo bridge fdb del " $1 " dev " $3}' > $tmp_file
+            bash -x $tmp_file 2>&1|tee > /dev/null
+            rm -f $tmp_file
+            echo "FINISHED: ############## $phase  ###################"
