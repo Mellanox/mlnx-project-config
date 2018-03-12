@@ -13,21 +13,15 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            HCA=MT27710
+            HCA=MT277
             PATH=$PATH:/usr/sbin
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
-            REQUIREMENTS_REPO=/home_stack/git/requirements
             FORCE=yes
-            MLNX_CINDER_BRANCH=refs/changes/56/505556/16
-            NOVA_BRANCH=refs/changes/40/482640/18
+            MLNX_CINDER_BRANCH=refs/changes/56/505556/27
+            NOVA_BRANCH=refs/changes/40/482640/21
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -39,7 +33,7 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - apply-workarounds-post-stack-{name}
-      - run-tests-{name}
+      - run-tests-attach-volume
       - run-tests-{name}-Tempest
       - produce-readme-file
     properties:
@@ -131,14 +125,14 @@
                 fi
             #fi
 
-            sudo chmod 777 /etc/cinder/rootwrap.d/volume.filters
-            sudo cat >> /etc/cinder/rootwrap.d/volume.filters <<EOF
+            #sudo chmod 777 /etc/cinder/rootwrap.d/volume.filters
+            #sudo cat >> /etc/cinder/rootwrap.d/volume.filters <<EOF
             # cinder/volume/targets/nvmet.py
-            nvmetcli: CommandFilter, nvmetcli, root
-            EOF
+            #nvmetcli: CommandFilter, nvmetcli, root
+            #EOF
 
-            sudo systemctl restart devstack@c-vol.service
-            sudo systemctl restart devstack@n-cpu.service
+            #sudo systemctl restart devstack@c-vol.service
+            #sudo systemctl restart devstack@n-cpu.service
 
 - builder:
     name: run-tests-NVMe-Tempest
@@ -156,12 +150,12 @@
                        tempest.api.volume.admin.test_volume_types_extra_specs_negative
                 )
                 cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
+                stestr init
+                stestr list ${tests[@]}
                 virtualenv virt --no-site-packages
                 . virt/bin/activate
                 virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
+                stestr run ${tests[@]}
                 test_pass=$?
                 deactivate
 
@@ -171,7 +165,7 @@
                 fi
 
 - builder:
-    name: run-tests-NVMe
+    name: run-tests-attach-volume
     builders:
         - shell: |
                 #!/bin/bash -ex
@@ -235,11 +229,11 @@
             phase="configure-devstack-NVMe"
             echo "STARTED: ############## $phase  ###################"
 
-            hca=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
-            HCA=${HCA:-hca}
+            #hca=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
+            #HCA=${HCA:-hca}
 
-            export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
-            export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
+            #export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            #export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
             echo "Using pci=$pci pf=$pf HCA=$HCA"
             if [[ -n $ZUUL_PROJECT ]]; then
               project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
@@ -251,9 +245,21 @@
             MLNX_PATCHES=""
             if [ -z $ZUUL_CHANGE ]; then
                 export MLNX_PATCHES="CINDER_BRANCH=$MLNX_CINDER_BRANCH"
-            elif [ $ZUUL_CHANGE != '505556'] ;then
+            elif [ "$ZUUL_CHANGE" != "505556" ] ;then
                 export MLNX_PATCHES="CINDER_BRANCH=$MLNX_CINDER_BRANCH"
             fi
+            #HCA=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
+
+            i=1
+            export ip1=1.1.1.1
+            export ip2=2.2.2.2
+
+            for pci in $(lspci |grep $HCA | grep -v Virtual | awk '{print $1}');do
+                for p in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}');do
+                    sudo ifconfig $p $i.$i.$i.$i/24 up
+                    let i=i+1
+                done
+            done
 
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
@@ -264,7 +270,7 @@
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
 
-            HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+            HOST_IP=$(hostname -I | awk '{print $1}')
 
             NOVA_BRANCH=$NOVA_BRANCH
             $MLNX_PATCHES
@@ -318,7 +324,7 @@
             volume_backend_name = lvmdriver-1
             target_ip_address = 1.1.1.1
             target_port = 4420
-            target_protocol=rdma
+            nvmet_protocol=rdma
             nvmet_port_id = 1
             target_prefix = default-subsys
             target_helper = nvmet
@@ -332,7 +338,7 @@
             volume_backend_name = lvmdriver-2
             target_ip_address = 2.2.2.2
             target_port = 4420
-            target_protocol=rdma
+            nvmet_protocol=rdma
             nvmet_port_id = 2
             target_prefix = default-subsys-2
             target_helper = nvmet

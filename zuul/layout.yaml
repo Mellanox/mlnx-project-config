@@ -220,7 +220,7 @@ pipelines:
 
 jobs:
   - name: Neutron-ML2-Sriov
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -242,7 +242,7 @@ jobs:
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
 
   - name: Neutron-MACVTAP-ML2-Sriov
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -265,7 +265,7 @@ jobs:
 
 
   - name: Neutron-ML2-MLNX
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -299,7 +299,7 @@ jobs:
 
 
   - name: Neutron-Networking-MLNX-ML2
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -311,7 +311,7 @@ jobs:
 
 
   - name: Nova-ML2-Sriov
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -338,7 +338,7 @@ jobs:
           - ^tox.ini$
 
   - name: Nova-MACVTAP-ML2-Sriov
-    branch: ^(master|stable/ocata|stable/pike).*$
+    branch: ^(master|stable/pike|stable/queens).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -420,8 +420,8 @@ projects:
       - Neutron-Networking-MLNX-ML2
       #- Neutron-ML2-MLNX
   - name: openstack/nova
-    check-mlnx-multinode:
-      - Nova-ML2-Sriov-Multinode
+#    check-mlnx-multinode:
+#      - Nova-ML2-Sriov-Multinode
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
@@ -431,6 +431,7 @@ projects:
 
   - name: openstack/cinder
     check-cinder:
+      - NVMe
       - Cinder-ISER-ISCSI
       - Cinder-ISER-LIO
   - name: openstack/os-brick

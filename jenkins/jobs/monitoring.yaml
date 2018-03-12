@@ -12,9 +12,8 @@
     builders:
       - inject:
           properties-content: |
-            LOGDIR=/jenkins/workspace/BACKUP-CI/ci-artifacts/logs
+            CI_ARTIFACTS=/tmp/BACKUP
             MAX_LOG_DAYS=60
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
@@ -41,7 +40,8 @@
             #!/bin/bash -x
 
             timestamp=$(date +%Y%m%d_%H%M)
-            dest="$LOGDIR/BACKUP/$timestamp"
+            dest=$CI_ARTIFACTS/$timestamp
+
             sudo chown -R stack $CI_ARTIFACTS
 
             sudo mkdir -p $dest/etc/
@@ -69,21 +69,19 @@
             sudo mkdir $dest/etc/puppet
             sudo cp -ra /etc/puppet/environments/common.yaml $dest/etc/puppet
 
-            sudo cp -ra /etc/jenkins_jobs $dest/etc/
+            sudo cp -ra /home/mlnx-project-config/jenkins/jobs $dest/etc/
 
             sudo chown -R stack $dest
             sudo chown -R stack $CI_ARTIFACTS
 
-            gzip -9 -r $dest 2>&1|tee > /dev/null
+            cd $CI_ARTIFACTS
+            sudo tar -zcvf $timestamp.gz $timestamp
+            sudo chmod 777 $timestamp.gz
 
-            UPLOAD_LOGPATH=/BACKUP/$timestamp
+            ssh $LOGSERVER mkdir -p /var/www/html/BACKUP
 
-            target=/var/www/html/${UPLOAD_LOGPATH}
-
-            ssh $LOGSERVER mkdir -p ${target}
-
-            scp -r $dest/* $LOGSERVER:$target 2>&1 | tee > /dev/null
-            # Copy tempest results
+            scp -r ${timestamp}.gz $LOGSERVER:/var/www/html/BACKUP 2>&1 | tee > /dev/null
 
             ip=$(echo $LOGSERVER | cut -d'@' -f2)
-            echo "Detailed logs: http://$ip/$UPLOAD_LOGPATH"
+            echo "Detailed logs: http://${ip}/BACKUP/${timestamp}"
+            sudo rm -f $timestamp.gz

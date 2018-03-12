@@ -10,13 +10,6 @@
             HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=git://git.openstack.org/openstack/cinder
-            GLANCE_REPO=git://git.openstack.org/openstack/glance
-            NEUTRON_REPO=git://git.openstack.org/openstack/neutron
-            KEYSTONE_REPO=git://git.openstack.org/openstack/keystone
-            TEMPEST_REPO=git://git.openstack.org/openstack/tempest
-            HORIZON_REPO=git://git.openstack.org/openstack/horizon
-            NOVA_REPO=git://git.openstack.org/openstack/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config

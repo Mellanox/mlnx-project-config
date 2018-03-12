@@ -81,12 +81,6 @@
           export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
           export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
           echo "pci=$pci, pf=$pf"
-          if [ -z "$ZUUL_PROJECT" ] || [ "$ZUUL_PROJECT" == 'openstack/os-vif' ]; then
-              export TEMP="TEMPEST_BRANCH=$MLNX_TEMPEST_BRANCH"
-          elif [ "$ZUUL_PROJECT" == 'openstack/tempest' ] && [ "$ZUUL_CHANGE" != "499575" ]; then
-              export TEMP="TEMPEST_BRANCH=$MLNX_TEMPEST_BRANCH"
-          fi
-          export NEUT="NEUTRON_BRANCH=$MLNX_NEUTRON_BRANCH"
 
           cat > $WORKSPACE/devstack/local.conf <<EOF
           [[local|localrc]]
@@ -102,8 +96,7 @@
           HOST_IP=$(hostname -i)
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
 
-          $NEUT
-          $TEMP
+          NEUTRON_BRANCH=refs/changes/90/481890/6
 
           LIBS_FROM_GIT=os-vif,neutron-lib
           Q_BUILD_OVS_FROM_GIT=True
@@ -216,8 +209,6 @@
             IMAGE_SERVER=52.169.200.208
             HCA=MT27710
             PATH=$PATH:/usr/sbin
-            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/5
-            MLNX_TEMPEST_BRANCH=refs/changes/75/499575/8
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -251,8 +242,6 @@
             IMAGE_SERVER=52.169.200.208
             HCA=MT27710
             PATH=$PATH:/usr/sbin
-            MLNX_NEUTRON_BRANCH=refs/changes/90/481890/5
-            MLNX_TEMPEST_BRANCH=refs/changes/75/499575/6
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -379,13 +368,19 @@
                 tempest.scenario.test_network_basic_ops
             )
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+
+            stestr init
+            stestr list ${tests[@]}
+
             virtualenv virt --no-site-packages
             . virt/bin/activate
+            test_pass=0
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
-            test_pass=$?
+            for test in $(stestr list ${tests[@]} | cut -d'[' -f1); do
+               stestr run $test
+               let test_pass=test_pass+$?
+               sleep 2
+            done
             deactivate
 
             if [[ $test_pass -ne 0 ]]; then

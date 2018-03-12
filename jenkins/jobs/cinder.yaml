@@ -1,15 +1,43 @@
 - builder:
-    name: apply-workarounds-post-stack-cinder-lio
+    name: apply-workarounds-post-stack-cinder
     builders:
         - shell: |
             #!/bin/bash -x
-            phase="apply-workarounds-post-stack-cinder-lio"
-            sudo pip install rtslib_fb===2.1.63
-            sudo dpkg --purge python-rtslib-fb
-            sudo systemctl restart devstack@c-vol.service
-            sudo systemctl restart devstack@c-sch.service
-            sudo systemctl stop tgt
+            phase="apply-workarounds-post-stack-cinder"
 
+- builder:
+    name: apply-workarounds-pre-stack-cinder
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="apply-workarounds-pre-stack-cinder"
+            if [ ! -f /usr/sbin/tgtd ]; then
+                sudo yum install -y scsi-target-utils
+                sudo systemctl enable tgtd
+                sudo systemctl start tgtd
+                sudo systemctl status tgtd
+            fi
+            sudo cat /etc/tgt/tgtd.conf | grep '/opt/stack/data/cinder/volumes/';
+            if [ $? -ne 0 ];then
+                sudo sh -c  "echo 'include /opt/stack/data/cinder/volumes/*'>>/etc/tgt/tgtd.conf"
+            fi
+
+- builder:
+    name: apply-workarounds-pre-stack-Cinder-ISER-ISCSI
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="apply-workarounds-pre-stack-Cinder-ISER-ISCSI"
+            sudo systemctl start tgtd
+            sudo systemctl status tgtd
+
+- builder:
+    name: apply-workarounds-pre-stack-Cinder-ISER-LIO
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="apply-workarounds-pre-stack-Cinder-ISER-LIO"
+            sudo systemctl stop tgtd
 
 - builder:
     name: configure-devstack-cinder
@@ -19,7 +47,7 @@
             phase="configure-devstack-Cinder-$CINDER_PROTOCOL"
             echo "STARTED: ############## $phase  ###################"
 
-            HCA=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
+            #HCA=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
 
             i=1
             export ip1=1.1.1.1
@@ -38,7 +66,6 @@
               project=${project//-/_}
               export ${project^^}_BRANCH=$refspec
             fi
-
 
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
@@ -92,24 +119,24 @@
             [[post-config|/etc/cinder/cinder.conf]]
             [DEFAULT]
             enabled_backends=lvmdriver-1,backend1
-
+            target_helper=$CINDER_PROTOCOL
             [lvmdriver-1]
             lvm_type = default
-            iscsi_helper = $CINDER_PROTOCOL
+            target_helper = $CINDER_PROTOCOL
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-1
-            iscsi_protocol = iser
-            iscsi_ip_address = $ip1
+            target_protocol = iser
+            target_ip_address = $ip1
 
             [backend1]
             lvm_type = default
-            iscsi_helper = $CINDER_PROTOCOL
+            target_helper = $CINDER_PROTOCOL
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = backend1
-            iscsi_ip_address = $ip2
-            iscsi_protocol = iser
+            target_ip_address = $ip2
+            target_protocol = iser
 
             [[test-config|/opt/stack/tempest/etc/tempest.conf]]
             [volume]
@@ -135,26 +162,26 @@
         - 'Cinder-ISER-LIO'
 
 ########### SimX #############################
-- project:
-    name: SimX-Run-ISER-LIO
-    github-org: openstack-dev
-    node: CINDER-SIMX-LIO
-    jobs:
-        - 'SimX-Run-ISER-LIO'
+#- project:
+#    name: SimX-Run-ISER-LIO
+#    github-org: openstack-dev
+#    node: CINDER-SIMX-LIO
+#    jobs:
+#        - 'SimX-Run-ISER-LIO'
 
-- project:
-    name: SimX-Run-ISER-ISCSI
-    github-org: openstack-dev
-    node: CINDER-SIMX-ISCSI
-    jobs:
-        - 'SimX-Run-ISER-ISCSI'
+#- project:
+#    name: SimX-Run-ISER-ISCSI
+#    github-org: openstack-dev
+#    node: CINDER-SIMX-ISCSI
+#    jobs:
+#        - 'SimX-Run-ISER-ISCSI'
 
-- project:
-    name: SimX-Run-VM
-    github-org: openstack-dev
-    node: SimX-Server
-    jobs:
-        - 'SimX-Run-VM'
+#- project:
+#    name: SimX-Run-VM
+#    github-org: openstack-dev
+#    node: SimX-Server
+#    jobs:
+#        - 'SimX-Run-VM'
 
 
 - job-template:
@@ -166,15 +193,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27710
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
-            NOVA_REPO=/home_stack/git/nova
+            #GLANCE_REPO=/home_stack/git/glance
+            #NEUTRON_REPO=/home_stack/git/neutron
+            #KEYSTONE_REPO=/home_stack/git/keystone
+            #TEMPEST_REPO=/home_stack/git/tempest
+            #HORIZON_REPO=/home_stack/git/horizon
+            #NOVA_REPO=/home_stack/git/nova
             FORCE=yes
             CINDER_PROTOCOL=tgtadm
       - check-environment
@@ -183,8 +210,12 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
+      - apply-workarounds-pre-stack-cinder
+      - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack-cinder
       - apply-workarounds-post-stack
+      - run-tests-attach-volume
       - run-tests-cinder
       - produce-readme-file
     properties:
@@ -217,12 +248,6 @@
             HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
-            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -230,6 +255,7 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
+      #- apply-workarounds-pre-stack-cinder
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       #- run-tests-cinder
@@ -265,12 +291,6 @@
             HCA=mlx5
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
-            NOVA_REPO=/home_stack/git/nova
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -301,39 +321,39 @@
           fail: true
 
 
-- job-template:
-    name: 'SimX-Run-VM'
-    node: '{node}'
-    concurrent: true
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
-            LOGSERVER=cloudx@$EXT_SERVER
-            IMAGE_SERVER=52.169.200.208
-            PATH=$PATH:/usr/sbin
-            SIMX_SNAPSHOT=Simx2.4-2359_20170214
-            FORCE=yes
-      - load-vm
-      - waitforonline-vm
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: mlnx-openstack-ci@dev.mellanox.co.il
-          subject: SimX job is being failed, please debug
-          failure: true
-      - upload-console-log
-    wrappers:
-      - timeout:
-          timeout: 320
-          fail: true
+#- job-template:
+#    name: 'SimX-Run-VM'
+#    node: '{node}'
+#    concurrent: true
+#    builders:
+#      - inject:
+#          properties-content: |
+#            LOGDIR=$WORKSPACE/ci-artifacts/logs
+#            EXT_SERVER=52.169.200.208
+#            LOGSERVER=cloudx@$EXT_SERVER
+#            IMAGE_SERVER=52.169.200.208
+#            PATH=$PATH:/usr/sbin
+#            SIMX_SNAPSHOT=Simx2.4-2359_20170214
+#            FORCE=yes
+#      - load-vm
+#      - waitforonline-vm
+#      - produce-readme-file
+#    properties:
+#      - build-discarder:
+#          days-to-keep: 70
+#          num-to-keep: 300
+#          artifact-days-to-keep: 70
+#          artifact-num-to-keep: 500
+#    publishers:
+#      - email-ext:
+#          recipients: mlnx-openstack-ci@dev.mellanox.co.il
+#          subject: SimX job is being failed, please debug
+#          failure: true
+#      - upload-console-log
+#    wrappers:
+#      - timeout:
+#          timeout: 320
+#          fail: true
 
 
 - job-template:
@@ -345,15 +365,15 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=52.169.200.208
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=27710
+            HCA=MT277
             IMAGE_SERVER=52.169.200.208
             PATH=$PATH:/usr/sbin
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
-            NOVA_REPO=/home_stack/git/nova
+            #GLANCE_REPO=/home_stack/git/glance
+            #NEUTRON_REPO=/home_stack/git/neutron
+            #KEYSTONE_REPO=/home_stack/git/keystone
+            #TEMPEST_REPO=/home_stack/git/tempest
+            #HORIZON_REPO=/home_stack/git/horizon
+            #NOVA_REPO=/home_stack/git/nova
             CINDER_PROTOCOL=lioadm
             FORCE=yes
       - check-environment
@@ -362,10 +382,12 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
+      - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack-cinder
       - apply-workarounds-post-stack
-      - apply-workarounds-post-stack-cinder-lio
       - run-tests-cinder
+      - run-tests-attach-volume
       - produce-readme-file
     properties:
       - build-discarder:
@@ -388,79 +410,79 @@
 ######################################################
 ###               SimX NODE CI     ##################
 ######################################################
-- job:
-    name: SimX-Cinder-ISER-LIO
-    project-type: multijob
-    node: cloudx-17
-    concurrent: false
-#    triggers:
-#      - timed: 'H 0 * * *'
-    builders:
-       - multijob:
-           name: SimX-Run-VM
-           condition: ALWAYS
-           projects:
-              - name: SimX-Run-VM
-                current-parameters: true
-                predefined-parameters: |
-                   HCA=mlx5
-                   FORCE=yes
-                   SIMX_VM=cloudx-17-07
-       - multijob:
-           name: SimX-Run-ISER-LIO
-           condition: SUCCESSFUL
-           projects:
-              - name: SimX-Run-ISER-LIO
-                current-parameters: true
-                predefined-parameters: |
-                   HCA=mlx5
-                   FORCE=yes
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    wrappers:
-      - timeout:
-          timeout: 500
-
-- job:
-    name: SimX-Cinder-ISER-ISCSI
-    project-type: multijob
-    node: cloudx-17
+#- job:
+#    name: SimX-Cinder-ISER-LIO
+#    project-type: multijob
+#    node: cloudx-17
 #    concurrent: false
 #    triggers:
 #      - timed: 'H 0 * * *'
-    builders:
-       - multijob:
-           name: Simx-ISCSI
-           condition: ALWAYS
-           projects:
-              - name: SimX-Run-VM
-                current-parameters: true
-                predefined-parameters: |
-                   HCA=mlx5
-                   FORCE=yes
-                   SIMX_VM=cloudx-17-04
-       - multijob:
-           name: SimX-Run-ISER-ISCSI
-           condition: SUCCESSFUL
-           projects:
-              - name: SimX-Run-ISER-ISCSI
-                current-parameters: true
-                predefined-parameters: |
-                   HCA=mlx5
-                   FORCE=yes
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    wrappers:
-      - timeout:
-          timeout: 500
+#    builders:
+#       - multijob:
+#           name: SimX-Run-VM
+#           condition: ALWAYS
+#           projects:
+#              - name: SimX-Run-VM
+#                current-parameters: true
+#                predefined-parameters: |
+#                   HCA=MT27700
+#                   FORCE=yes
+#                   SIMX_VM=cloudx-17-07
+#       - multijob:
+#           name: SimX-Run-ISER-LIO
+#           condition: SUCCESSFUL
+#           projects:
+#              - name: SimX-Run-ISER-LIO
+#                current-parameters: true
+#                predefined-parameters: |
+#                   HCA=MT27700
+#                   FORCE=yes
+#    properties:
+#      - build-discarder:
+#          days-to-keep: 70
+#          num-to-keep: 300
+#          artifact-days-to-keep: 70
+#          artifact-num-to-keep: 500
+#    wrappers:
+#      - timeout:
+#          timeout: 500
+
+#- job:
+#    name: SimX-Cinder-ISER-ISCSI
+#    project-type: multijob
+#    node: cloudx-17
+#    concurrent: false
+#    triggers:
+#      - timed: 'H 0 * * *'
+#    builders:
+#       - multijob:
+#           name: Simx-ISCSI
+#           condition: ALWAYS
+#           projects:
+#              - name: SimX-Run-VM
+#                current-parameters: true
+#                predefined-parameters: |
+#                   HCA=MT27700
+#                   FORCE=yes
+#                   SIMX_VM=cloudx-17-04
+#       - multijob:
+#           name: SimX-Run-ISER-ISCSI
+#           condition: SUCCESSFUL
+#           projects:
+#              - name: SimX-Run-ISER-ISCSI
+#                current-parameters: true
+#                predefined-parameters: |
+#                   HCA=MT27700
+#                   FORCE=yes
+#    properties:
+#      - build-discarder:
+#          days-to-keep: 70
+#          num-to-keep: 300
+#          artifact-days-to-keep: 70
+#          artifact-num-to-keep: 500
+#    wrappers:
+#      - timeout:
+#          timeout: 500
 
 
 - builder:
@@ -473,19 +495,19 @@
                        tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
+                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
                        tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                        tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest
                        tempest.api.volume.admin.test_volume_types_extra_specs_negative
                 )
                 cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
+                stestr init
+                stestr list ${tests[@]}
                 virtualenv virt --no-site-packages
                 . virt/bin/activate
                 virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
+                stestr run ${tests[@]}
                 test_pass=$?
                 deactivate
 
@@ -509,11 +531,11 @@
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
+                stestr init
+                stestr list ${tests[@]}
                 test_pass=0
                 for test in ${tests[@]}; do
-                    testr run $test
+                    stestr run $test
                     rc=$?
                     let test_pass=test_pass+$rc
                 done
@@ -538,12 +560,12 @@
                        tempest.scenario.test_stamp_pattern.TestStampPattern
                 )
                 cd /opt/stack/tempest
-                testr list-tests ${tests[@]}
-                testr init
+                stestr init
+                stestr list ${tests[@]}
                 virtualenv virt --no-site-packages
                 . virt/bin/activate
                 virt/bin/pip install -U -r requirements.txt
-                testr run ${tests[@]}
+                stestr run ${tests[@]}
                 test_pass=$?
                 deactivate
 

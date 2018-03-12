@@ -1,7 +1,7 @@
 - builder:
     name: check-environment
     builders:
-        - clone-git
+        #- clone-git
         - shell: |
             #!/bin/bash -x
             status=0
@@ -60,7 +60,7 @@
             [ -d /opt/stack/tempest/virt ] && . /opt/stack/tempest/virt/bin/activate
             pip freeze > $CI_ARTIFACTS/env/pip-freeze-tempest.txt
             cat /etc/issue|grep -i 'ubuntu'
-            if [ ! -z $? ]; then
+            if [ "$?" -eq 0  ]; then
                 dpkg --list|sort > $CI_ARTIFACTS/env/packages.txt
             else
                 rpm -qa| sort > $CI_ARTIFACTS/env/packages.txt
@@ -79,13 +79,14 @@
             [ -f /usr/bin/ofed_info ] && /usr/bin/ofed_info -s 2>&1| tee > $CI_ARTIFACTS/env/ofed.info
 
             sudo cp /etc/modprobe.d/ml* $CI_ARTIFACTS/etc/
+            [ -f /etc/tgt/tgtd.conf ] && sudo cp /etc/tgt/tgtd.conf $CI_ARTIFACTS/etc/
 
             projects=(glance nova neutron eswitchd cinder keystone swift ironic ironic-inspector)
             for project in ${projects[@]}; do
                 [ -d /etc/$project ] && cp -r /etc/$project $CI_ARTIFACTS/etc/
             done
 
-            [ -d /opt/stack/tempest/.testrepository ] && cp -L -r /opt/stack/tempest/.testrepository $CI_ARTIFACTS/
+            [ -d /opt/stack/tempest/.stestr ] && cp -L -r /opt/stack/tempest/.stestr $CI_ARTIFACTS/
             [ -f /opt/stack/tempest/tempest.log ] && cp -L /opt/stack/tempest/tempest.log $LOGDIR/
             [ -f /opt/stack/tempest/etc/tempest.conf ] && cp -L /opt/stack/tempest/etc/tempest.conf $CI_ARTIFACTS
             [ -f $WORKSPACE/devstack/local.conf ] && cp $WORKSPACE/devstack/local.conf $CI_ARTIFACTS
@@ -150,10 +151,11 @@
             #[ ! -d $WORKSPACE/devstack/ ] && git clone https://github.com/openstack-dev/devstack.git $WORKSPACE/devstack
             echo "Cleaning up possible remainings of previous builds."
 
-            sudo kill -9 $(ps -ef |grep python | grep neutron | awk '{print $2}')
+            #sudo kill -9 $(ps -ef |grep python | grep neutron | awk '{print $2}')
             sudo systemctl stop devstack*
             sleep 20
             $WORKSPACE/devstack/clean.sh
+            sudo kill -9 $(pgrep neutron-server) 2>&1|tee > /dev/null
 
             # Remove stack screens leftovers
             sudo screen -wipe
@@ -165,7 +167,7 @@
                 sudo lvs
                 sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
                 sudo nvmetcli clear 2>&1|tee
-                sudo service tgt stop > /dev/null 2>&1 || true
+                sudo systemctl stop tgtd > /dev/null 2>&1 || true
             fi
 
             sudo kill $(pgrep rabbitmq)
@@ -178,7 +180,7 @@
             sudo kill -9 $(ps -ef |grep neutron | grep -v grep | awk '{print $2}')
             kill -9 $(ps -ef |grep add_mac | grep -v grep | awk '{print $2}') 2>&1|tee > /dev/null
 
-            [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
+            [ -d /opt/stack/tempest/.stestr ] && rm -rf /opt/stack/tempest/.stestr
 
             cd $WORKSPACE/devstack
             for i in $(pip list|grep -v pip|awk '{print $1}'); do
@@ -194,7 +196,7 @@
 
             cat /etc/issue|grep -i 'ubuntu'
             if [ ! -z $? ]; then
-                sudo apt-get install python-docutils python-pkg-resources gnupg -y 2>&1|tee
+                sudo apt-get install python-docutils python-pkg-resources gnupg libpcre3-dev -y 2>&1|tee
                 sudo apt-get remove -y $(dpkg --list|grep apache2 | awk '{print $2}')
                 sudo systemctl stop httpd
                 sudo dpkg --purge $(dpkg --list|grep apache2 | awk '{print $2}')
@@ -231,7 +233,7 @@
                 done
             done
 
-            sudo kill -9 $(ps -ef |grep python|grep -v grep| grep -v ipoibd)
+            #sudo kill -9 $(ps -ef |egrep "python|conf"|grep -v grep| egrep -v "ipoibd|tuned")
             for i in $(ifconfig -a|egrep "^q" | cut -d':' -f1); do sudo ip link delete $i; done
 
             echo "Check if ipoibd is running"
@@ -247,6 +249,8 @@
             sudo journalctl --vacuum-time=1seconds
             sudo systemctl restart systemd-journald
             sudo systemctl restart libvirtd 2>&1|tee
+            echo "Show alll python processes"
+            ps -ef |grep python
             echo "FINISHED:############## $phase  ###################"
 
 - builder:
@@ -424,6 +428,8 @@
           flavor_ref_alt=2
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -519,6 +525,8 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -611,6 +619,8 @@
           [validation]
           ssh_timeout = 300
           ping_timeout = 400
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -723,6 +733,8 @@
           flavor_ref_alt=2
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -817,6 +829,8 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -911,6 +925,8 @@
           port_vnic_type=direct
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1007,6 +1023,8 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1101,7 +1119,8 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1201,6 +1220,8 @@
           port_vnic_type=direct
           [validation]
           ssh_timeout = 300
+          #[auth]
+          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1209,7 +1230,7 @@
     name: mlnx-project-config
     builders:
        - shell: |
-          #!/bin/bash -x
+          #!/bin/bash -ex
           phase="EXTERNAL-TESTING-CHECKOUT"
           echo "STARTED: ############## $phase  ###################"
           [ -d $WORKSPACE/mlnx-project-config ] && rm -rf $WORKSPACE/mlnx-project-config
@@ -1240,7 +1261,11 @@
           fi
           sleep 20
           . $WORKSPACE/devstack/openrc admin
-          nova-manage cell_v2 discover_hosts
+          if [ -f $WORKSPACE/devstack/tools/discover_hosts.sh ]; then
+              $WORKSPACE/devstack/tools/discover_hosts.sh
+          else
+              nova-manage cell_v2 discover_hosts
+          fi
           sleep 20
           nova hypervisor-list
           echo "############## Stack is up and running ###################"
@@ -1251,16 +1276,16 @@
     name: collect-devstack-syslog
     builders:
       - shell: |
-          #!/bin/bash -x
-          LOGDIR=${LOGDIR:-/opt/stack/logs}
-          CI_ARTIFACTS=$(dirname ${LOGDIR})/logs
+          #!/bin/bash
+          CI_ARTIFACTS=${LOGDIR:-/opt/stack/logs}
           echo "Saving SYSLOG files to $CI_ARTIFACTS"
           mkdir -p $CI_ARTIFACTS
           sudo systemctl status devstack\* > $CI_ARTIFACTS/devstack_services_status.log
-          for s in $(systemctl list-unit-files| grep devstack | awk '{print $1}')
+          for s in $(systemctl list-unit-files| grep devstack | awk '{print $1}'|sort)
           do
-              echo "saving $s in $CI_ARTIFACTS/$s.log"
-              sudo journalctl -o short-precise --unit $s > $CI_ARTIFACTS/$s.log
+              log_name=$(echo $s|cut -d'@' -f2).log
+              echo "$CI_ARTIFACTS/$log_name"
+              sudo journalctl -o short-precise --unit $s > $CI_ARTIFACTS/$log_name
           done
 
 
@@ -1287,13 +1312,13 @@
             echo "STARTED: ############## $phase  ###################"
             cd /opt/stack/tempest
             tests=ironic_tempest_plugin.tests.api
-            testr list-tests ${tests[@]}
+            stestr init
+            stestr list ${tests[@]}
             #tox -eall ${tests[@]}
-            testr init
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
             deactivate
 
@@ -1360,7 +1385,8 @@
                   #tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_instance_port_admin_state
                   tempest.scenario.test_network_basic_ops.TestNetworkBasicOps.test_update_router_admin_state
              )
-            tests=(tempest.api.network.admin.test_dhcp
+            tests=(
+                tempest.api.network.admin.test_dhcp
                 tempest.api.network.admin.test_agent
                 tempest.api.network.test_floating_ips
                 tempest.api.network.test_networks
@@ -1375,18 +1401,21 @@
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkBasicOps.test_server_connectivity_reboot
             )
 
-
             cd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
-            virtualenv virt --no-site-packages
-            . virt/bin/activate
-            virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
-            #testr run tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_reboot
-            #testr run tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_pause_unpause
-            test_pass=$?
-            deactivate
+            stestr init
+            stestr list ${tests[@]}
+            #virtualenv virt --no-site-packages
+            #. virt/bin/activate
+            #virt/bin/pip install -U -r requirements.txt
+            #stestr run ${tests[@]}
+            for t in $(stestr list ${tests[@]} |cut -d'[' -f1); do
+                stestr run $t
+                let test_pass=test_pass+$?
+                sleep 1
+            done
+
+            #test_pass=$?
+            #deactivate
             if [[ $test_pass -ne 0 ]]; then
                 echo "FINISHED with ERROR: ############## $phase  ###################"
                 exit 1
@@ -1409,12 +1438,12 @@
                 tempest.api.network.test_extensions
             )
             cd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+            stestr init
+            stestr list ${tests[@]}
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
             deactivate
 
@@ -1433,9 +1462,9 @@
             echo "STARTED: ############## $phase  ###################"
             cd /opt/stack/tempest
             test_list=/tmp/tempst_list_$$
-            testr init
-            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
-            testr run --load-list=$test_list
+            stestr init
+            stestr list neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
+            stestr run --load-list=$test_list
             test_pass=$?
             rm -f $test_list
 
@@ -1474,12 +1503,12 @@
                 #neutron.tests.tempest.scenario.test_floatingip
                 )
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+            stestr init
+            stestr list ${tests[@]}
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
             deactivate
             if [[ $test_pass -ne 0 ]]; then
@@ -1497,17 +1526,14 @@
             if [ ! -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/pike' ]; then
                 echo "Branch $ZUUL_BRANCH is not supported"
                 exit 0
-            elif [ ! -z $ZUUL_BRANCH ] && [ $ZUUL_BRANCH == 'stable/ocata' ]; then
-                echo "Branch $ZUUL_BRANCH is not supported"
-                exit 0
             fi
-            exit 0
+            #exit 0
             phase="run-tests-network-add"
             echo "STARTED: ############## $phase  ###################"
             #pushd /opt/stack/neutron-tempest-plugin/
             #sudo python ./setup.py install
             pushd /opt/stack/tempest
-            testr init
+            stestr init
             tests = (
                    #depends on https://review.openstack.org/#/c/530854/ refs/changes/54/530854/1
                    neutron_tempest_plugin.scenario.test_floatingip
@@ -1516,7 +1542,7 @@
                    neutron_tempest_plugin.scenario.test_portsecurity
                    #Unstable neutron_tempest_plugin.scenario.test_floatingip.FloatingIpSeparateNetwork.test_east_west
                    )
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
 
             if [[ $test_pass -ne 0 ]]; then
@@ -1534,11 +1560,11 @@
             phase="RUN-TESTS-NETWORK-BASIC"
             echo "STARTED: ############## $phase  ###################"
             pushd /opt/stack/tempest
-            testr init
+            stestr init
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run tempest.scenario.test_network_basic_ops
+            stestr run tempest.scenario.test_network_basic_ops
             test_pass=$?
             deactivate
 
@@ -1558,7 +1584,7 @@
             echo "STARTED: ############## $phase  ###################"
             neutron net-list
             cd /opt/stack/tempest
-            testr init
+            stestr init
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
@@ -1581,13 +1607,13 @@
                 tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_stop_start
             )
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+            stestr init
+            stestr list ${tests[@]}
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
             status=0
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             status=$?
             deactivate
 
@@ -1605,11 +1631,11 @@
             #!/bin/bash
             phase="RUN-TESTS-MULTINODE"
             source $WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/devstack/openrc admin
-            nova-manage cell_v2 discover_hosts
+            $WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/devstack/tools/discover_hosts.sh
             nova hypervisor-list
             sleep 60
 
-            [ -d /opt/stack/tempest/.testrepository ] && rm -rf /opt/stack/tempest/.testrepository
+            [ -d /opt/stack/tempest/.stestr ] && rm -rf /opt/stack/tempest/.stestr
             echo "STARTED: ############## $phase  ###################"
             tests=(
                   tempest.scenario.test_server_multinode.TestServerMultinode.test_schedule_to_all_nodes
@@ -1618,12 +1644,12 @@
                   #tempest.scenario.test_network_advanced_server_ops.TestNetworkAdvancedServerOps.test_server_connectivity_cold_migration
             )
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+            stestr init
+            stestr list ${tests[@]}
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
             deactivate
 
@@ -1735,12 +1761,12 @@
                 )
 
             pushd /opt/stack/tempest
-            testr list-tests ${tests[@]}
-            testr init
+            stestr init
+            stestr list ${tests[@]}
             virtualenv virt --no-site-packages
             . virt/bin/activate
             virt/bin/pip install -U -r requirements.txt
-            testr run ${tests[@]}
+            stestr run ${tests[@]}
             test_pass=$?
             deactivate
 
@@ -1763,14 +1789,17 @@
           dmesg -T 2>&1|tee > $CI_ARTIFACTS/logs/dmesg.log
           mysql -e"show status like 'Conn%';" > $CI_ARTIFACTS/logs/mysql_connections.txt
           netstat  | grep CONNEC|wc $CI_ARTIFACTS/logs/netstat_connections.txt
-          echo "TGT Status"
-          sudo service tgt status 2>&1 |tee
+
+          if [ ! -f /usr/sbin/tgtd ];then
+              echo "TGT Status"
+              sudo systemctl status tgtd 2>&1 |tee
+          fi
 
           tmp_subunit=/tmp/tempest_results_$$
           for results in '/opt/stack/neutron' '/opt/stack/tempest'; do
-              testrepository=$results/.testrepository/0
-              if [[ -f $testrepository ]]; then
-                  pushd $results/.testrepository
+             stestr_tests=$results/.stestr/0
+              if [ -f $stestr_tests ]; then
+                  pushd $results/.stestr
                   for file in `find . -regex '.*[0-9][0-9]?'`
                       do cat $file >> $tmp_subunit
                   done
@@ -1778,7 +1807,7 @@
               fi
           done
           if [ -f $tmp_subunit ]; then
-              $WORKSPACE/mlnx-project-config/tools/subunit2html.py $tmp_subunit $CI_ARTIFACTS/testr_results.html
+              $WORKSPACE/mlnx-project-config/tools/subunit2html.py $tmp_subunit $CI_ARTIFACTS/stestr_results.html
               rm -f $tmp_subunit
           fi
           sudo chown -R stack $CI_ARTIFACTS
@@ -1818,8 +1847,8 @@
           ip=$(echo $LOGSERVER | cut -d'@' -f2)
           echo "Detailed logs: http://$ip/$UPLOAD_LOGPATH"
 
-          if [ -f $CI_ARTIFACTS/testr_results.html.gz ]; then
-              echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/testr_results.html.gz"
+          if [ -f $CI_ARTIFACTS/stestr_results.html.gz ]; then
+              echo "Tempest results: http://$ip/$UPLOAD_LOGPATH/stestr_results.html.gz"
               echo "Devstack configuration: http://$ip/$UPLOAD_LOGPATH/local.conf.gz"
           fi
 
@@ -1880,11 +1909,13 @@
           #!/bin/bash -x
 
           dayofweek=$(date +%u)
-          if [ $dayofweek != '0' ];then
+          if [ "$dayofweek" != '0' ] && [ -d /home_stack/git/neutron ]; then
+          #if [ $dayofweek != '0' ] && [ -d /home_stack/git/neutron ] ;then
               echo "Not Sunday no git update"
-              exit 0
+          #    exit 0
+          else
+              echo "Sunday. It's a git update date"
           fi
-          echo "Sunday. It's a git update date"
 
           REPOS=(
                      git://git.openstack.org/openstack/requirements.git
@@ -1910,7 +1941,7 @@
           echo "Updating ${REPOS[@]}"
 
           repo_dir=/home_stack/git
-          [ ! -d $repo_dir ] && mkdir $repo_dir
+          [ ! -d $repo_dir ] && mkdir -p $repo_dir
           pushd $repo_dir
 
           for repo in ${REPOS[@]}; do

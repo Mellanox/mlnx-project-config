@@ -20,13 +20,6 @@
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-            CINDER_REPO=/home_stack/git/cinder
-            GLANCE_REPO=/home_stack/git/glance
-            NEUTRON_REPO=/home_stack/git/neutron
-            KEYSTONE_REPO=/home_stack/git/keystone
-            REQUIREMENTS_REPO=/home_stack/git/requirements
-            TEMPEST_REPO=/home_stack/git/tempest
-            HORIZON_REPO=/home_stack/git/horizon
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -101,10 +94,10 @@
             echo "STARTED: ############## $phase  ###################"
             cd /opt/stack/tempest
             test_list=/tmp/tempst_list_$$
-            testr init
-            testr list-tests neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
-            #testr run --load-list=$test_list
-            testr run neutron.tests.tempest.scenario.test_qos
+            stestr init
+            stestr list neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
+            #stestr run --load-list=$test_list
+            stestr run neutron.tests.tempest.scenario.test_qos
             test_pass=$?
             rm -f $test_list
 
