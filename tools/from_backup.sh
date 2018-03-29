@@ -1,7 +1,7 @@
 #!/bin/bash
 
 folder=$1
-URL='http://52.169.200.208/BACKUP/'
+URL='http://13.74.249.42/BACKUP/'
 
 if [ -z "$folder" ];then
     folder=$(ls -ltr $nfs | tail -n1|awk '{print $9}')

@@ -204,9 +204,9 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             HCA=MT27710
             PATH=$PATH:/usr/sbin
             FORCE=yes
@@ -237,9 +237,9 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             HCA=MT27710
             PATH=$PATH:/usr/sbin
             FORCE=yes

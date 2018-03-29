@@ -5,18 +5,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -52,18 +45,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -98,18 +84,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -145,18 +124,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -190,18 +162,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -237,18 +202,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -258,9 +216,8 @@
       - configure-devstack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      #- run-tests-neutron
       #- 'run-tests-{name}-API'
-      #- run-tests-network-add
+      - run-tests-network-add
       - run-tests-network-basic
       - run-tests-network-advanced
       - produce-readme-file
@@ -286,19 +243,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - check-environment
       - mlnx-project-config
@@ -332,19 +281,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
             FORCE=yes
       - mlnx-project-config
       - noop-run
@@ -467,11 +408,6 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
-              #- name: Tempest-Sriov
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
@@ -487,16 +423,20 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
-              #- name: Cinder-ISER-LIO
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
-              #- name: Cinder-ISER-ISCSI
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/pike
+                   FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/37/551937/1
+                   DEVSTACK_BRANCH=refs/changes/74/555174/1
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/pike
+                   FORCE=yes
+                   REQUIREMENTS_BRANCH=refs/changes/37/551937/1
+                   DEVSTACK_BRANCH=refs/changes/74/555174/1
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -566,19 +506,12 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #REQUIREMENTS_REPO=/home_stack/git/requirements
-            #HORIZON_REPO=/home_stack/git/horizon
-            TEMPEST_BRANCH=refs/changes/46/548546/2
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -607,20 +540,12 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #REQUIREMENTS_REPO=/home_stack/git/requirements
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            TEMPEST_BRANCH=refs/changes/46/548546/2
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -648,20 +573,12 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
-            #CINDER_REPO=/home_stack/git/cinder
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #REQUIREMENTS_REPO=/home_stack/git/requirements
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
-            TEMPEST_BRANCH=refs/changes/46/548546/2
       - mlnx-project-config
       - run-tests-multinode
       - stop-stacksh
@@ -684,10 +601,10 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../Nova-ML2-Sriov-Multinode-Controller/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT27520
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
        - stop-stacksh

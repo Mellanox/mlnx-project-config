@@ -5,10 +5,10 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             FORCE=yes
       - check-environment
@@ -92,14 +92,10 @@
           enable_service tempest
 
           # microversion patch
-          #enable_plugin ironic https://github.com/openstack/ironic refs/changes/58/260358/6
-
-          #TEMPEST_BRANCH=refs/changes/07/292307/6
-
           NOVA_BRANCH=refs/changes/40/266540/11
-          enable_plugin ironic https://github.com/openstack/ironic refs/changes/63/264263/24
-          enable_plugin ironic-inspector https://github.com/openstack/ironic-inspector refs/changes/57/264257/22
-          enable_plugin tempest https://github.com/openstack/tempest refs/changes/07/292307/6
+          enable_plugin ironic https://github.com/openstack/ironic
+          enable_plugin ironic-inspector https://github.com/openstack/ironic-inspector
+          enable_plugin tempest https://github.com/openstack/tempest
 
           Q_PLUGIN=ml2
           Q_AGENT=openvswitch

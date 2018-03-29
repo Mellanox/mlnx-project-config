@@ -420,8 +420,8 @@ projects:
       - Neutron-Networking-MLNX-ML2
       #- Neutron-ML2-MLNX
   - name: openstack/nova
-#    check-mlnx-multinode:
-#      - Nova-ML2-Sriov-Multinode
+    check-mlnx-multinode:
+      - Nova-ML2-Sriov-Multinode
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov

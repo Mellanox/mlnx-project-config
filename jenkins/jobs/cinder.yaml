@@ -47,8 +47,6 @@
             phase="configure-devstack-Cinder-$CINDER_PROTOCOL"
             echo "STARTED: ############## $phase  ###################"
 
-            #HCA=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
-
             i=1
             export ip1=1.1.1.1
             export ip2=2.2.2.2
@@ -67,6 +65,12 @@
               export ${project^^}_BRANCH=$refspec
             fi
 
+            if [ $ZUUL_BRANCH == 'stable/pike' ]; then
+                export target='iscsi'
+            else
+                export target='target'
+            fi
+
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
             DOWNLOAD_DEFAULT_IMAGES=True
@@ -80,7 +84,7 @@
 
             RECLONE=yes
             LOG_COLOR=False
-            PIP_UPGRADE=True
+            PIP_UPGRADE=False
             LOGDIR=${LOGDIR:-/opt/stack/logs}
             LOGFILE=$LOGDIR/stack.sh.log
             LIBS_FROM_GIT=os-brick
@@ -90,13 +94,10 @@
             VOLUME_NAME_PREFIX="volume-"
             VOLUME_BACKING_FILE_SIZE=10250M
 
-            #DISABLED_SERVICES=n-net
-            #ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
             #disable_service=horizon
             DISABLED_SERVICES=n-net
             enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
             disable_service = horizon
-
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -119,31 +120,31 @@
             [[post-config|/etc/cinder/cinder.conf]]
             [DEFAULT]
             enabled_backends=lvmdriver-1,backend1
-            target_helper=$CINDER_PROTOCOL
+            ${target}_helper=$CINDER_PROTOCOL
+
             [lvmdriver-1]
+            ${target}_helper = $CINDER_PROTOCOL
+            ${target}_protocol = iser
+            ${target}_ip_address = $ip1
             lvm_type = default
-            target_helper = $CINDER_PROTOCOL
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-1
-            target_protocol = iser
-            target_ip_address = $ip1
 
             [backend1]
+            ${target}_helper = $CINDER_PROTOCOL
+            ${target}_ip_address = $ip2
+            ${target}_protocol = iser
             lvm_type = default
-            target_helper = $CINDER_PROTOCOL
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = backend1
-            target_ip_address = $ip2
-            target_protocol = iser
 
             [[test-config|/opt/stack/tempest/etc/tempest.conf]]
             [volume]
             backend_names = lvmdriver-1,backend1
             [volume-feature-enabled]
             multi_backend = True
-
             EOF
             echo "FINISHED: ############## $phase  ###################"
 
@@ -191,17 +192,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
             FORCE=yes
             CINDER_PROTOCOL=tgtadm
       - check-environment
@@ -243,10 +238,10 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             FORCE=yes
       - check-environment
@@ -286,10 +281,10 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             FORCE=yes
       - check-environment
@@ -329,9 +324,9 @@
 #      - inject:
 #          properties-content: |
 #            LOGDIR=$WORKSPACE/ci-artifacts/logs
-#            EXT_SERVER=52.169.200.208
+#            EXT_SERVER=13.74.249.42
 #            LOGSERVER=cloudx@$EXT_SERVER
-#            IMAGE_SERVER=52.169.200.208
+#            IMAGE_SERVER=13.74.249.42
 #            PATH=$PATH:/usr/sbin
 #            SIMX_SNAPSHOT=Simx2.4-2359_20170214
 #            FORCE=yes
@@ -363,17 +358,11 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=MT277
-            IMAGE_SERVER=52.169.200.208
+            IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            #GLANCE_REPO=/home_stack/git/glance
-            #NEUTRON_REPO=/home_stack/git/neutron
-            #KEYSTONE_REPO=/home_stack/git/keystone
-            #TEMPEST_REPO=/home_stack/git/tempest
-            #HORIZON_REPO=/home_stack/git/horizon
-            #NOVA_REPO=/home_stack/git/nova
             CINDER_PROTOCOL=lioadm
             FORCE=yes
       - check-environment

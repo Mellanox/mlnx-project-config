@@ -1,6 +1,6 @@
 - project:
     name: TEMPLATE
-    node: master
+    node: ETH_CX34
     jobs:
       - 'TEMPLATE'
 
@@ -15,18 +15,18 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             HCA=MT27710
             PATH=$PATH:/usr/sbin
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
+      #- check-environment
+      #- mlnx-project-config
+      #- clean-environment
+      #- clone-devstack
+      #- apply-workarounds-pre-stack
+      #- configure-devstack-{name}
+      #- run-stacksh # Running Devstack
+      #- apply-workarounds-post-stack
       - run-tests-{name}
       - produce-readme-file
     properties:
@@ -51,6 +51,15 @@
         - shell: |
             #!/bin/bash
             phase="RUN-TESTS-Neutron"
+            status=0
+            cd /tmp
+            for file in cirros-mellanox_eth.img cirros-mellanox-x86_64-disk-ib.img; do
+                wget http://$IMAGE_SERVER/images/$file
+                if [ ! -f $file ]; then
+                    echo "Failed to download http://$IMAGE_SERVER/images/$file"
+                    status=1
+                fi
+            done
             echo "STARTED: ############## $phase  ###################"
 
 - builder:

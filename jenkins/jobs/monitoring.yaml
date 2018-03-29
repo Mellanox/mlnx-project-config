@@ -14,7 +14,7 @@
           properties-content: |
             CI_ARTIFACTS=/tmp/BACKUP
             MAX_LOG_DAYS=60
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             HCA=mlx5
             PATH=$PATH:/usr/sbin
@@ -58,8 +58,8 @@
 
             sudo mkdir -p $dest/var/lib/jenkins
             sudo chown jenkins:jenkins  $dest/var/lib/jenkins
-            sudo -u jenkins cp -ra /var/lib/jenkins/.ssh/*  $dest/var/lib/jenkins
-
+            sudo cp -ra /var/lib/jenkins/.ssh/* $dest/var/lib/jenkins
+            sudo chown jenkins -R $dest/var/lib/jenkins 
             sudo mkdir $dest/etc/zuul
             sudo cp -ra /etc/zuul/* $dest/etc/zuul
 
@@ -83,5 +83,6 @@
             scp -r ${timestamp}.gz $LOGSERVER:/var/www/html/BACKUP 2>&1 | tee > /dev/null
 
             ip=$(echo $LOGSERVER | cut -d'@' -f2)
-            echo "Detailed logs: http://${ip}/BACKUP/${timestamp}"
+            echo "Saved under http://${ip}/BACKUP/${timestamp}"
+            echo "Run mlnx-project-config/tools/from_backup.sh $timestamp"
             sudo rm -f $timestamp.gz

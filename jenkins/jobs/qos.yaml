@@ -16,7 +16,7 @@
             HCA=27800
             RX_RATE_LIMIT=10
             PATH=$PATH:/usr/sbin
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin

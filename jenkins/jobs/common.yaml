@@ -162,11 +162,16 @@
             screen -wipe
 
             # Check Cinder leftovers
-            if [ $(echo $JOB_NAME|grep Cinder) ]; then
+            if [ $(echo $JOB_NAME|grep -i Cinder) ]; then
                 echo "Cleaning Cinder left volumes"
                 sudo lvs
-                sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
-                sudo nvmetcli clear 2>&1|tee
+                #sudo $WORKSPACE/mlnx-project-config/tools/cinder-rtstool clean
+                if [ -f /usr/bin/cinder-rtstool ]; then
+                    for target in $(cinder-rtstool get-targets); do
+                        sudo cinder-rtstool delete $target
+                    done
+                fi
+                [ -f /usr/sbin/nvmetcli ] && sudo nvmetcli clear 2>&1|tee
                 sudo systemctl stop tgtd > /dev/null 2>&1 || true
             fi
 
@@ -186,6 +191,11 @@
             for i in $(pip list|grep -v pip|awk '{print $1}'); do
                 sudo pip uninstall $i -y;
             done
+            for file in $(ls -1 /usr/local/lib/python2.7/dist-packages/ | grep -v pip);do
+                sudo rm -rf /usr/local/lib/python2.7/dist-packages/$file
+            done
+
+            sudo pip install pip==9.0.1
 
             sudo kill -9 `pgrep ovsdb-server`
             sudo kill -9 `pgrep ovs-vswitchd`
@@ -360,7 +370,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(hostname -i)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -458,7 +468,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -555,7 +565,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -661,7 +671,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(hostname -i)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -764,7 +774,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -774,7 +784,7 @@
           LOGFILE=\$LOGDIR/stack.sh.log
           LOG_COLOR=False
           RECLONE=yes
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           # Cinder
           VOLUME_BACKING_FILE_SIZE=1000M
           # Keystone
@@ -864,7 +874,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -958,7 +968,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1054,7 +1064,7 @@
           RABBIT_PASSWORD=password
           SERVICE_PASSWORD=password
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1156,7 +1166,7 @@
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
           HOST_IP=$(host $(hostname) | cut -d' ' -f4)
-          PIP_UPGRADE=yes
+          PIP_UPGRADE=False
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           mlnx_dev=$mlnx_dev
           mlnx_port=$mlnx_port
@@ -1283,9 +1293,9 @@
           sudo systemctl status devstack\* > $CI_ARTIFACTS/devstack_services_status.log
           for s in $(systemctl list-unit-files| grep devstack | awk '{print $1}'|sort)
           do
-              log_name=$(echo $s|cut -d'@' -f2).log
-              echo "$CI_ARTIFACTS/$log_name"
-              sudo journalctl -o short-precise --unit $s > $CI_ARTIFACTS/$log_name
+              log_name=$CI_ARTIFACTS/$(echo $s|cut -d'@' -f2).log
+              echo $log_name
+              sudo journalctl -o short-precise --unit $s > $log_name
           done
 
 
@@ -1300,7 +1310,7 @@
           if [ -f $WORKSPACE/devstack/unstack.sh ];then
              $WORKSPACE/devstack/unstack.sh 2>&1|tee
           fi
-          sudo nvmetcli clear 2>&1|tee
+           [ -f /usr/sbin/nvmetcli ] && sudo nvmetcli clear 2>&1|tee
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -1453,27 +1463,6 @@
             fi
             echo "FINISHED: ############## $phase  ###################"
 
-- builder:
-    name: run-tests-neutron
-    builders:
-        - shell: |
-            #!/bin/bash
-            phase="RUN-TESTS-Neutron"
-            echo "STARTED: ############## $phase  ###################"
-            cd /opt/stack/tempest
-            test_list=/tmp/tempst_list_$$
-            stestr init
-            stestr list neutron.tests | grep tempest|egrep -v "neutron.tests.tempest.api" > $test_list
-            stestr run --load-list=$test_list
-            test_pass=$?
-            rm -f $test_list
-
-            if [[ $test_pass -ne 0 ]]; then
-                echo "FINISHED with ERROR: ############## $phase  ###################"
-                exit 1
-            fi
-            echo "FINISHED: ############## $phase  ###################"
-
 
 - builder:
     name: run-tests-Neutron-Networking-MLNX-ML2
@@ -1530,17 +1519,16 @@
             #exit 0
             phase="run-tests-network-add"
             echo "STARTED: ############## $phase  ###################"
-            #pushd /opt/stack/neutron-tempest-plugin/
-            #sudo python ./setup.py install
             pushd /opt/stack/tempest
             stestr init
-            tests = (
-                   #depends on https://review.openstack.org/#/c/530854/ refs/changes/54/530854/1
-                   neutron_tempest_plugin.scenario.test_floatingip
-                   #No patch for direct neutron_tempest_plugin.scenario.test_basic
-                   neutron_tempest_plugin.scenario.test_basic
-                   neutron_tempest_plugin.scenario.test_portsecurity
-                   #Unstable neutron_tempest_plugin.scenario.test_floatingip.FloatingIpSeparateNetwork.test_east_west
+            tests=(
+                   neutron_tempest_plugin.scenario.admin.test_floatingip.FloatingIpTestCasesAdmin
+                   #TOFIX vnic_type still normal
+                   #neutron_tempest_plugin.scenario.test_basic.NetworkBasicTest
+                   neutron_tempest_plugin.scenario.test_floatingip.DefaultSnatToExternal
+                   #TOFIX vnic_type still normal
+                   #neutron_tempest_plugin.scenario.test_security_groups.NetworkSecGroupTest
+                   neutron_tempest_plugin.scenario.test_security_groups.NetworkSecGroupTest.test_ip_prefix
                    )
             stestr run ${tests[@]}
             test_pass=$?
@@ -1892,6 +1880,7 @@
           #git clone /home_stack/git/devstack
           git clone https://github.com/openstack-dev/devstack.git
           pushd $WORKSPACE/devstack
+          #git fetch https://git.openstack.org/openstack-dev/devstack refs/changes/74/555174/1 && git checkout FETCH_HEAD
           ZUUL_BRANCH=${ZUUL_BRANCH:='master'}
           git fetch
           git checkout $ZUUL_BRANCH

@@ -15,13 +15,13 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             HCA=MT277
             PATH=$PATH:/usr/sbin
-            EXT_SERVER=52.169.200.208
+            EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
             FORCE=yes
-            MLNX_CINDER_BRANCH=refs/changes/56/505556/27
-            NOVA_BRANCH=refs/changes/40/482640/21
+            MLNX_CINDER_BRANCH=refs/changes/56/505556/29
+            NOVA_BRANCH=refs/changes/40/482640/22
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -107,14 +107,12 @@
     builders:
         - shell: |
             #!/bin/bash -x
-            echo "apply-workarounds-post-stack-NVMe"
-            exit 0
+            #echo "apply-workarounds-post-stack-NVMe"
             #if [ -z $ZUUL_CHANGE ]; then
-            #    cd /opt/stack/os-brick
-            #    git fetch git://git.openstack.org/openstack/os-brick $MLNX_OS_BRICK_BRANCH && git cherry-pick FETCH_HEAD
-            #    cd /opt/stack/cinder
-            #    git fetch git://git.openstack.org/openstack/cinder $MLNX_CINDER_BRANCH && git cherry-pick FETCH_HEAD
-            #else
+            #    echo "Skipping NVMe updates"
+            #    exit 0
+            #fi
+            exit 0
                 if [ $ZUUL_CHANGE != '482642' ]; then
                     cd /opt/stack/os-brick
                     git fetch git://git.openstack.org/openstack/os-brick $MLNX_OS_BRICK_BRANCH && git cherry-pick FETCH_HEAD
@@ -123,16 +121,8 @@
                     cd /opt/stack/cinder
                     git fetch git://git.openstack.org/openstack/cinder $MLNX_CINDER_BRANCH && git cherry-pick FETCH_HEAD
                 fi
-            #fi
+             sudo systemctl restart devstack@c-vol.service
 
-            #sudo chmod 777 /etc/cinder/rootwrap.d/volume.filters
-            #sudo cat >> /etc/cinder/rootwrap.d/volume.filters <<EOF
-            # cinder/volume/targets/nvmet.py
-            #nvmetcli: CommandFilter, nvmetcli, root
-            #EOF
-
-            #sudo systemctl restart devstack@c-vol.service
-            #sudo systemctl restart devstack@n-cpu.service
 
 - builder:
     name: run-tests-NVMe-Tempest
@@ -229,11 +219,6 @@
             phase="configure-devstack-NVMe"
             echo "STARTED: ############## $phase  ###################"
 
-            #hca=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
-            #HCA=${HCA:-hca}
-
-            #export pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
-            #export pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
             echo "Using pci=$pci pf=$pf HCA=$HCA"
             if [[ -n $ZUUL_PROJECT ]]; then
               project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
@@ -248,7 +233,6 @@
             elif [ "$ZUUL_CHANGE" != "505556" ] ;then
                 export MLNX_PATCHES="CINDER_BRANCH=$MLNX_CINDER_BRANCH"
             fi
-            #HCA=$(lspci |grep Mellanox | awk '{print $6}'|grep -v '/'|head -n1)
 
             i=1
             export ip1=1.1.1.1
@@ -290,8 +274,6 @@
             DISABLED_SERVICES=n-net
             enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
             disable_service = horizon
-            #ENABLED_SERVICES+=,q-svc,q-agt,q-dhcp,q-l3,q-meta,q-metering,neutron
-            #disable_service=horizon
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -324,7 +306,7 @@
             volume_backend_name = lvmdriver-1
             target_ip_address = 1.1.1.1
             target_port = 4420
-            nvmet_protocol=rdma
+            target_protocol = nvmet_rdma
             nvmet_port_id = 1
             target_prefix = default-subsys
             target_helper = nvmet
@@ -338,7 +320,7 @@
             volume_backend_name = lvmdriver-2
             target_ip_address = 2.2.2.2
             target_port = 4420
-            nvmet_protocol=rdma
+            target_protocol = nvmet_rdma
             nvmet_port_id = 2
             target_prefix = default-subsys-2
             target_helper = nvmet
