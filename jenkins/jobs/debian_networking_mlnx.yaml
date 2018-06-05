@@ -1,0 +1,84 @@
+- project:
+    name: DEBIAN_PACKAGE_CHECK
+    node: daily
+    jobs:
+      - 'DEBIAN_PACKAGE_CHECK'
+
+- job-template:
+    name: 'DEBIAN_PACKAGE_CHECK'
+    node: '{node}'
+    concurrent: false
+    parameters:
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            HCA=MT27710
+            PATH=$PATH:/usr/sbin
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=$EXT_SERVER
+            PATH=$PATH:/usr/sbin
+            PYTHONHTTPSVERIFY=0
+      - check-debian
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log #This line must be the last one
+
+
+
+- builder:
+    name: check-debian
+    builders:
+        - python: |
+            #!/bin/python
+            import json
+            import sys
+            import urllib
+            import urllib2
+            import os
+            print os.environ
+            try:
+                jenkinsUrl = os.environ['UBUNTUURL']
+            except:
+                jenkinsUrl = "https://stretch-queens.debian.net/job/"
+            jobName="networking-mlnx"
+            jobNameURL = urllib.quote(jobName)
+            try:
+                jenkinsStream   = urllib2.urlopen( jenkinsUrl + jobNameURL + "/lastBuild/api/json" )
+            except urllib2.HTTPError, e:
+                print "URL Error: " + str(e.code)
+                print "      (job name [" + jobName + "] probably wrong)"
+                sys.exit(2)
+
+            try:
+               buildStatusJson = json.load( jenkinsStream )
+            except:
+               print "Failed to parse json"
+               sys.exit(3)
+
+            if buildStatusJson.has_key( "result" ):
+                print "##############################################################"
+                print "##############################################################"
+                print "##############################################################"
+                print "[" + jobName + "] build status: " + buildStatusJson["result"]
+                print "##############################################################"
+                print "##############################################################"
+                print "##############################################################"
+                if buildStatusJson["result"] != "SUCCESS" :
+                   exit(4)
+            else:
+               sys.exit(5)
+            print "Check original %s/%s" % (jenkinsUrl, jobName)
+            sys.exit(0)

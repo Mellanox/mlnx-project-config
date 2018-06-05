@@ -59,7 +59,7 @@
             sudo mkdir -p $dest/var/lib/jenkins
             sudo chown jenkins:jenkins  $dest/var/lib/jenkins
             sudo cp -ra /var/lib/jenkins/.ssh/* $dest/var/lib/jenkins
-            sudo chown jenkins -R $dest/var/lib/jenkins 
+            sudo chown jenkins -R $dest/var/lib/jenkins
             sudo mkdir $dest/etc/zuul
             sudo cp -ra /etc/zuul/* $dest/etc/zuul
 

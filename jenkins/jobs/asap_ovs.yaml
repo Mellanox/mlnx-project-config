@@ -76,6 +76,8 @@
       - shell: |
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK"
+          export NEUTRON_OVS_HW_BRANCH=${NEUTRON_OVS_HW_BRANCH:-'refs/changes/90/481890/9'}
+
           echo "STARTED: ############## $phase  ###################"
 
           export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
@@ -96,10 +98,11 @@
           HOST_IP=$(hostname -i)
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
 
-          NEUTRON_BRANCH=refs/changes/90/481890/6
+          NEUTRON_BRANCH=$NEUTRON_OVS_HW_BRANCH
 
           LIBS_FROM_GIT=os-vif,neutron-lib
           Q_BUILD_OVS_FROM_GIT=True
+          OVS_BRANCH=v2.9.0
 
           PUBLIC_INTERFACE=$pf
           # Logging
@@ -132,8 +135,8 @@
           disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-novnc n-xvnc n-cpu placement-api tempest
 
-          enable_plugin neutron https://github.com/openstack/neutron
-          enable_plugin os-vif https://github.com/openstack/os-vif
+          enable_plugin neutron https://github.com/openstack/neutron $ZUUL_BRANCH
+          enable_plugin os-vif https://github.com/openstack/os-vif $ZUUL_BRANCH
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -178,7 +181,8 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT27710
+            #HCA=MT27800
+            HCA=MT27800
             PATH=$PATH:/usr/sbin
             RELEASE=latest
        - asap-configure
@@ -207,7 +211,7 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT27710
+            HCA=MT27800
             PATH=$PATH:/usr/sbin
             FORCE=yes
       - check-environment
@@ -240,7 +244,7 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT27710
+            HCA=MT27800
             PATH=$PATH:/usr/sbin
             FORCE=yes
       - check-environment
@@ -270,7 +274,7 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT27710
+            HCA=MT27800
             PATH=$PATH:/usr/sbin
             RELEASE_DIR=/jenkins/ASAP
             RELEASE=ASAP2_DIRECT-3.0-rc29
@@ -389,3 +393,45 @@
             fi
             popd
             echo "FINISHED: ############## $phase  ###################"
+
+- job:
+    name: Mellanox-Check-OVS-HW
+    project-type: multijob
+    node:  daily
+    builders:
+       - multijob:
+           name: Mellanox-CI-Daily-Master-Status
+           condition: ALWAYS
+           projects:
+              - name: OVS_HW_offload
+                current-parameters: true
+                predefined-parameters: |
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
+                   FORCE=yes
+              - name: OVS_HW_offload_Neutron
+                current-parameters: true
+                predefined-parameters: |
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
+                   FORCE=yes
+              - name: OVS_HW_offload
+                current-parameters: true
+                predefined-parameters: |
+                   FORCE=yes
+                   ZUUL_BRANCH=stable/queens
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
+              - name: OVS_HW_offload_Neutron
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/queens
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
+                   FORCE=yes
+
+
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+    wrappers:
+      - timeout:
+          timeout: 150

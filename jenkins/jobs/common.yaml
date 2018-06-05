@@ -5,19 +5,13 @@
         - shell: |
             #!/bin/bash -x
             status=0
-            for i in $(ip link |awk '{print $2}' | egrep ':$'|cut -d':' -f1)
-            do
-               sudo ip link set $i up
-            done
-
             sudo killall -9 radvd 2>&1|tee > /dev/null
-            sudo losetup -a
 
             sudo cat /proc/cmdline |grep intel_iommu
-            if [ "$?" != "0" ]; then
-                echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg and run grub-mkconfig"
-                #exit 1
-            fi
+            #if [ "$?" != "0" ] && [ ! $(echo $JOB_NAME|grep -i Cinder) ] then
+            #    echo "please add intel_iommu=on to /boot/grub/menu.lst or /etc/default/grub.cfg and run grub-mkconfig"
+            #    exit 1
+            #fi
 
             for pci in $(lspci |grep Mell |grep -v Virtual|awk '{print $1}'); do
                 for p in $(ls -l /sys/class/net/ |grep $pci|awk '{print $9}'); do
@@ -39,6 +33,18 @@
             #    exit 1
             fi
 
+            for i in $(ip link |awk '{print $2}' | egrep ':$'|cut -d':' -f1)
+            do
+               sudo ip link set $i up
+            done
+
+            ssh $LOGSERVER ls /tmp
+            if [ "$?" != "0" ]; then
+                echo "ERROR!!! no passwordless copy to $LOGSERVER"
+                echo "#sudo -u stack ssh-keygen"
+                echo "#sudo -u stack ssh-copy-id cloudx@13.74.249.42"
+                exit 1
+            fi
 
             echo "Environment is OK"
 
@@ -93,14 +99,14 @@
             [ -f /var/log/eswitchd/eswitchd.log ] && cp /var/log/eswitchd/eswitchd.log $LOGDIR
 
             sudo cp /var/log/libvirt/libvirtd.log $LOGDIR
-            sudo cp -r /var/log/libvirt/qemu $LOGDIR
+            #sudo cp -r /var/log/libvirt/qemu $LOGDIR
 
             pushd /opt/stack
             for folder in $(ls -l /opt/stack| egrep -v "log|status"| grep ^d| awk '{print $9}'); do
                 mkdir -p $CI_ARTIFACTS/env/git/$folder
                 pushd $folder
                 git status > $CI_ARTIFACTS/env/git/${folder}/git_status.txt
-                git log > $CI_ARTIFACTS/env/git/${folder}/git_log.txt
+                git log |head -n100 > $CI_ARTIFACTS/env/git/${folder}/git_log.txt
                 git show > $CI_ARTIFACTS/env/git/${folder}/git_show.txt
                 x=$(git rev-parse HEAD 2>/dev/null)
                 if [ $? -eq 0 ]; then
@@ -155,7 +161,11 @@
             sudo systemctl stop devstack*
             sleep 20
             $WORKSPACE/devstack/clean.sh
+            sudo systemctl stop devstack*
+            sudo systemctl stop devstack*
             sudo kill -9 $(pgrep neutron-server) 2>&1|tee > /dev/null
+            echo "Show procs after cleaning"
+            ps -ef |egrep "python|stack"
 
             # Remove stack screens leftovers
             sudo screen -wipe
@@ -172,7 +182,9 @@
                     done
                 fi
                 [ -f /usr/sbin/nvmetcli ] && sudo nvmetcli clear 2>&1|tee
+                sudo losetup -a
                 sudo systemctl stop tgtd > /dev/null 2>&1 || true
+                sudo lvremove -f stack-volumes-lvmdriver-1
             fi
 
             sudo kill $(pgrep rabbitmq)
@@ -195,10 +207,9 @@
                 sudo rm -rf /usr/local/lib/python2.7/dist-packages/$file
             done
 
-            sudo pip install pip==9.0.1
-
-            sudo kill -9 `pgrep ovsdb-server`
-            sudo kill -9 `pgrep ovs-vswitchd`
+            sudo kill -9 $(pgrep ovsdb-server)
+            sudo kill -9 $(pgrep ovs-vswitchd)
+            sudo kill -9 $(pgrep haproxy)
 
             pushd /usr/local/lib/python2.7/dist-packages/
             sudo rm -rf $(ls -1 | grep -v pip)
@@ -226,6 +237,7 @@
             sudo pip install docutils
             sudo pip install oslo.privsep
             sudo pip install requests
+            sudo pip install subunit
 
             [ -d $WORKSPACE/ci-artifacts ] && rm -rf $WORKSPACE/ci-artifacts
             if [[ -n $ZUUL_PROJECT ]]; then
@@ -255,6 +267,7 @@
             fi
 
             sudo rm -rf /opt/stack
+            sudo rm -f /var/log/libvirt/qemu/*
             env
             sudo journalctl --vacuum-time=1seconds
             sudo systemctl restart systemd-journald
@@ -299,8 +312,8 @@
                 fi
             done
 
-            sudo modprobe ib_isert 2>&1|tee > /dev/null
-            sudo modprobe ib_iser 2>&1|tee > /dev/null
+            #sudo modprobe ib_isert 2>&1|tee > /dev/null
+            #sudo modprobe ib_iser 2>&1|tee > /dev/null
 
 - builder:
     name: apply-workarounds-post-stack-Nova-ML2-Sriov-Multinode-Compute
@@ -438,8 +451,6 @@
           flavor_ref_alt=2
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -535,8 +546,6 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -629,8 +638,6 @@
           [validation]
           ssh_timeout = 300
           ping_timeout = 400
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -743,8 +750,6 @@
           flavor_ref_alt=2
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -839,8 +844,6 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -935,8 +938,6 @@
           port_vnic_type=direct
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1033,8 +1034,6 @@
           interface_attach = False
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1129,8 +1128,6 @@
           extensions=fdb
           [FDB]
           shared_physical_device_mappings=default:${mlnx_port}
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
@@ -1230,8 +1227,6 @@
           port_vnic_type=direct
           [validation]
           ssh_timeout = 300
-          #[auth]
-          #tempest_roles = Admin
           EOF
           echo "FINISHED: ############## $phase  ###################"
 

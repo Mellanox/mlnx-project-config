@@ -321,11 +321,6 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
                    FORCE=yes
-              - name: Nova-ML2-Sriov-Multinode
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
@@ -365,11 +360,13 @@
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
                    FORCE=yes
               - name: OVS_HW_offload_Neutron
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
                    FORCE=yes
     properties:
       - build-discarder:
@@ -398,11 +395,6 @@
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
-              #- name: Nova-ML2-Sriov-Multinode
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/pike
-              #     FORCE=yes
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
@@ -429,14 +421,14 @@
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
                    REQUIREMENTS_BRANCH=refs/changes/37/551937/1
-                   DEVSTACK_BRANCH=refs/changes/74/555174/1
+                   #DEVSTACK_BRANCH=refs/changes/74/555174/1
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/pike
                    FORCE=yes
                    REQUIREMENTS_BRANCH=refs/changes/37/551937/1
-                   DEVSTACK_BRANCH=refs/changes/74/555174/1
+                   #DEVSTACK_BRANCH=refs/changes/74/555174/1
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -463,8 +455,6 @@
                 current-parameters: true
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
-              - name: Nova-ML2-Sriov-Multinode
-                current-parameters: true
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
@@ -483,8 +473,19 @@
                 current-parameters: true
               - name: OVS_HW_offload
                 current-parameters: true
+                predefined-parameters: |
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
+                   FORCE=yes
               - name: OVS_HW_offload_Neutron
                 current-parameters: true
+                predefined-parameters: |
+                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
+                   FORCE=yes
+              - name: DEBIAN_PACKAGE_CHECK
+                current-parameters: true
+                predefined-parameters: |
+                   UBUNTUURL=https://stretch-queens.debian.net/job/
+                   FORCE=yes
     properties:
       - build-discarder:
           days-to-keep: 70

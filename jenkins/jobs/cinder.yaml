@@ -11,6 +11,11 @@
         - shell: |
             #!/bin/bash -x
             phase="apply-workarounds-pre-stack-cinder"
+            sudo modprobe -r ib_isert 2>&1|tee > /dev/null
+            sudo modprobe -r ib_iser 2>&1|tee > /dev/null
+            sudo modprobe ib_isert 2>&1|tee > /dev/null
+            sudo modprobe ib_iser 2>&1|tee > /dev/null
+
             if [ ! -f /usr/sbin/tgtd ]; then
                 sudo yum install -y scsi-target-utils
                 sudo systemctl enable tgtd
@@ -205,7 +210,6 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
-      - apply-workarounds-pre-stack-cinder
       - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
@@ -250,7 +254,6 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
-      #- apply-workarounds-pre-stack-cinder
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       #- run-tests-cinder
@@ -478,10 +481,12 @@
     name: run-tests-cinder
     builders:
       - shell: |
-                #!/bin/bash +ex
+                #!/bin/bash -x
                 echo "============ Starting tempest tests ====================="
                 tests=(
-                       tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
+                       #tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
+                       #tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes.test_encrypted_cinder
+                       tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes.test_encrypted_cinder_volumes_cryptsetup
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
                        tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
                        tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
@@ -491,14 +496,10 @@
                        tempest.api.volume.admin.test_volume_types_extra_specs_negative
                 )
                 cd /opt/stack/tempest
+                sudo pip install stestr
                 stestr init
-                stestr list ${tests[@]}
-                virtualenv virt --no-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
                 stestr run ${tests[@]}
                 test_pass=$?
-                deactivate
 
                 if [[ $test_pass -ne 0 ]]; then
                     echo "FINISHED with ERROR: ############## $phase  ###################"
