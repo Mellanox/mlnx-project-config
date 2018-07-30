@@ -1,16 +1,16 @@
 - job-template:
     name: 'Nova-ML2-Sriov'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -26,9 +26,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -41,16 +41,16 @@
 - job-template:
     name: 'Nova-MACVTAP-ML2-Sriov'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -65,9 +65,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -80,16 +80,16 @@
 - job-template:
     name: 'Tempest-Sriov'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -105,9 +105,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -120,6 +120,7 @@
 - job-template:
     name: 'Neutron-ML2-MLNX'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -129,7 +130,6 @@
             HCA=MT27520
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -143,9 +143,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -158,16 +158,16 @@
 - job-template:
     name: 'Neutron-MACVTAP-ML2-Sriov'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -183,9 +183,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -198,16 +198,16 @@
 - job-template:
     name: 'Neutron-ML2-Sriov'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -224,9 +224,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -248,7 +248,6 @@
             HCA=MT27520
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -262,9 +261,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -277,25 +276,25 @@
 - job-template:
     name: 'NOOP'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT277
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - mlnx-project-config
       - noop-run
       - produce-readme-file
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -310,7 +309,7 @@
     project-type: multijob
     node:  daily
     triggers:
-      - timed: 'H 0 * * *'
+      - timed: '@daily'
     builders:
       - multijob:
            name: Mellanox-CI-Daily-StableQueens-Status
@@ -320,121 +319,108 @@
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Tempest-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Cinder-ISER-LIO
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/queens
-                   FORCE=yes
-              - name: OVS_HW_offload
+              #- name: OVS_HW_offload
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/queens
+              #- name: OVS_HW_offload_Neutron
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     ZUUL_BRANCH=stable/queens
+              - name: DEBIAN_PACKAGE_CHECK
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
-                   FORCE=yes
-              - name: OVS_HW_offload_Neutron
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
-                   FORCE=yes
+                   UBUNTUURL=https://stretch-queens.debian.net/job
+
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     wrappers:
       - timeout:
           timeout: 500
 
 
 - job:
-    name: Mellanox-CI-Daily-StablePike-Status
+    name: Mellanox-CI-Daily-Stablerocky-Status
     project-type: multijob
     node:  daily
     triggers:
-      - timed: 'H 0 * * *'
+      - timed: '@daily'
     builders:
       - multijob:
-           name: Mellanox-CI-Daily-StablePike-Status
+           name: Mellanox-CI-Daily-Stablerocky-Status
            condition: ALWAYS
            projects:
               - name: Nova-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+                   ZUUL_BRANCH=stable/rocky
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+                   ZUUL_BRANCH=stable/rocky
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+                   ZUUL_BRANCH=stable/rocky
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+                   ZUUL_BRANCH=stable/rocky
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
+                   ZUUL_BRANCH=stable/rocky
               - name: Cinder-ISER-LIO
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/37/551937/1
-                   #DEVSTACK_BRANCH=refs/changes/74/555174/1
+                   ZUUL_BRANCH=stable/rocky
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/pike
-                   FORCE=yes
-                   REQUIREMENTS_BRANCH=refs/changes/37/551937/1
-                   #DEVSTACK_BRANCH=refs/changes/74/555174/1
+                   ZUUL_BRANCH=stable/rocky
+              - name: DEBIAN_PACKAGE_CHECK
+                current-parameters: true
+                predefined-parameters: |
+                   UBUNTUURL=https://stretch-rocky.debian.net/job
+
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     wrappers:
       - timeout:
           timeout: 500
@@ -445,7 +431,7 @@
     project-type: multijob
     node:  daily
     triggers:
-      - timed: 'H 0 * * *'
+      - timed: '@daily'
     builders:
        - multijob:
            name: Mellanox-CI-Daily-Master-Status
@@ -473,25 +459,18 @@
                 current-parameters: true
               - name: OVS_HW_offload
                 current-parameters: true
-                predefined-parameters: |
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
-                   FORCE=yes
               - name: OVS_HW_offload_Neutron
                 current-parameters: true
-                predefined-parameters: |
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
-                   FORCE=yes
-              - name: DEBIAN_PACKAGE_CHECK
-                current-parameters: true
-                predefined-parameters: |
-                   UBUNTUURL=https://stretch-queens.debian.net/job/
-                   FORCE=yes
+              #- name: DEBIAN_PACKAGE_CHECK
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     UBUNTUURL=https://stretch-rocky.debian.net/job
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     wrappers:
       - timeout:
           timeout: 500
@@ -509,7 +488,7 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27520
+            HCA=MT27800
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
@@ -526,9 +505,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - upload-console-log-mn #This line must be the last one
 
@@ -543,7 +522,7 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27520
+            HCA=MT27800
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
@@ -559,9 +538,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - upload-console-log-mn #This line must be the last one
 
@@ -586,9 +565,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - upload-console-log-mn #This line must be the last one
 
@@ -612,9 +591,9 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10
     publishers:
       - upload-console-log-mn #This line must be the last one
 
@@ -637,7 +616,7 @@
            projects:
               - name: Nova-ML2-Sriov-Multinode-Compute
                 current-parameters: true
-                predefined-parameters: CONTROLLER_NODE=10.224.33.57
+                predefined-parameters: CONTROLLER_NODE=10.209.32.15
        - multijob:
            name: Tempest
            condition: SUCCESSFUL
@@ -653,6 +632,6 @@
     properties:
       - build-discarder:
           days-to-keep: 70
-          num-to-keep: 300
+          num-to-keep: 100
           artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
+          artifact-num-to-keep: 10

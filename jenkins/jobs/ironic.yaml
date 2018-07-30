@@ -82,7 +82,7 @@
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
           OVS_PHYSICAL_BRIDGE=br-$epioib_port
 
-          disable_service n-net n-novnc horizon
+          disable_service n-net n-novnc horizon dstat
           disable_service heat h-api h-api-cfn h-api-cw h-eng etcd3
           disable_service cinder c-sch c-api c-vol
           enable_service ironic ir-api ir-cond

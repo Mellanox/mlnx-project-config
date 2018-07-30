@@ -34,6 +34,7 @@
             echo "pci=$pci pf=$pf HCA=$HCA"
             NUM_VFS=4
 
+            sudo sh -c "echo 0 > /sys/class/net/${pf}/device/sriov_numvfs"
             sudo sh -c "echo $NUM_VFS > /sys/class/net/${pf}/device/sriov_numvfs"
 
             echo "Unbind devices"
@@ -76,8 +77,6 @@
       - shell: |
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK"
-          export NEUTRON_OVS_HW_BRANCH=${NEUTRON_OVS_HW_BRANCH:-'refs/changes/90/481890/9'}
-
           echo "STARTED: ############## $phase  ###################"
 
           export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
@@ -97,11 +96,9 @@
           IDENTITY_API_VERSION=3
           HOST_IP=$(hostname -i)
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
-
-          NEUTRON_BRANCH=$NEUTRON_OVS_HW_BRANCH
+          FORCE=yes
 
           LIBS_FROM_GIT=os-vif,neutron-lib
-          Q_BUILD_OVS_FROM_GIT=True
           OVS_BRANCH=v2.9.0
 
           PUBLIC_INTERFACE=$pf
@@ -132,7 +129,7 @@
           ALLOW_NEUTRON_DB_MIGRATIONS=true
           Q_USE_PROVIDERNET_FOR_PUBLIC=False
           # Services
-          disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3
+          disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3 dstat
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-novnc n-xvnc n-cpu placement-api tempest
 
           enable_plugin neutron https://github.com/openstack/neutron $ZUUL_BRANCH
@@ -181,8 +178,7 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            #HCA=MT27800
-            HCA=MT27800
+            HCA=MT277
             PATH=$PATH:/usr/sbin
             RELEASE=latest
        - asap-configure
@@ -203,7 +199,7 @@
 - job-template:
     name: 'OVS_HW_offload_Neutron'
     node: '{node}'
-    concurrent: false
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -211,9 +207,8 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT27800
+            HCA=MT277
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -236,7 +231,7 @@
 - job-template:
     name: 'OVS_HW_offload'
     node: '{node}'
-    concurrent: false
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -244,9 +239,8 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT27800
+            HCA=MT277
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -274,10 +268,10 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT27800
+            HCA=MT277
             PATH=$PATH:/usr/sbin
             RELEASE_DIR=/jenkins/ASAP
-            RELEASE=ASAP2_DIRECT-3.0-rc29
+            RELEASE=ASAP2_DIRECT-4.0-1
        - asap-update-kernel
        - install-missing-rpms
     properties:
@@ -299,8 +293,8 @@
             fi
 
             echo "Release: $RELEASE"
-            KERNEL=`ls -1 $RELEASE_DIR/$RELEASE/RPMS/kernel-[0-9].*.x86_64.rpm`
-            KERNEL_HEADERS=`ls -1 $RELEASE_DIR/$RELEASE/RPMS/kernel-headers-[0-9].*.x86_64.rpm`
+            KERNEL=`ls -1 $RELEASE_DIR/$RELEASE/kernel-[0-9].*.x86_64.rpm`
+            KERNEL_HEADERS=`ls -1 $RELEASE_DIR/$RELEASE/kernel-headers-[0-9].*.x86_64.rpm`
             echo "Kernel $KERNEL"
             echo "Kernel headers $KERNEL_HEADERS"
 
@@ -312,7 +306,7 @@
             sleep 3
 
             pushd $RELEASE_DIR/$RELEASE/RPMS/
-            sudo rpm -Uvh --force $(ls |egrep "kernel|iproute" |egrep -v "devel|src|debug|doc")
+            sudo rpm -Uvh --force $(find . |egrep "kernel|iproute" |egrep -v "devel|src|debug|doc")
             popd
 
             vmlinuz=`rpm -qlp $KERNEL | grep -m1 ^/boot/vmlinuz-`
@@ -393,45 +387,3 @@
             fi
             popd
             echo "FINISHED: ############## $phase  ###################"
-
-- job:
-    name: Mellanox-Check-OVS-HW
-    project-type: multijob
-    node:  daily
-    builders:
-       - multijob:
-           name: Mellanox-CI-Daily-Master-Status
-           condition: ALWAYS
-           projects:
-              - name: OVS_HW_offload
-                current-parameters: true
-                predefined-parameters: |
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
-                   FORCE=yes
-              - name: OVS_HW_offload_Neutron
-                current-parameters: true
-                predefined-parameters: |
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/90/481890/9
-                   FORCE=yes
-              - name: OVS_HW_offload
-                current-parameters: true
-                predefined-parameters: |
-                   FORCE=yes
-                   ZUUL_BRANCH=stable/queens
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
-              - name: OVS_HW_offload_Neutron
-                current-parameters: true
-                predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
-                   NEUTRON_OVS_HW_BRANCH=refs/changes/56/571956/1
-                   FORCE=yes
-
-
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 100
-          artifact-days-to-keep: 70
-    wrappers:
-      - timeout:
-          timeout: 150

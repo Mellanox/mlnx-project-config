@@ -35,9 +35,9 @@
     properties:
       - build-discarder:
           days-to-keep: 60
-          num-to-keep: 200
+          num-to-keep: 100
           artifact-days-to-keep: 60
-          artifact-num-to-keep: 200
+          artifact-num-to-keep: 100
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -173,7 +173,7 @@
             ALLOW_NEUTRON_DB_MIGRATIONS=true
             Q_USE_PROVIDERNET_FOR_PUBLIC=False
             # Services
-            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3
+            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw c-vol etcd3 dstat
             enable_service n-xvnc n-novnc horizon
             enable_service neutron q-svc q-dhcp q-l3 q-meta q-agt q-sriov-agt q-qos
             enable_plugin neutron $NEUTRON_REPO $NEUTRON_BRANCH

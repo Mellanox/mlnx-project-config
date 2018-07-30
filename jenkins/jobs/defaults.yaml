@@ -2,10 +2,9 @@
     name: global
     description: |
       <p><b>This job is managed by puppet and will be overwritten. Do not edit this job through the web</b></p>
-      <a href="http://10.224.33.37:8080/job/{name}/lastBuild/consoleFull">See last console on local Jenkins</a>
+      <a href="http://10.212.19.4:8080/job/{name}/lastBuild/consoleFull">See last console on local Jenkins</a>
     project-type: freestyle
     concurrent: true
-
     wrappers:
       - timeout:
           timeout: 150
@@ -13,7 +12,7 @@
       - timestamps
 
     build-discarder:
-      daysToKeep: 100
-      numToKeep: 1000
-      artifactDaysToKeep: 100
-      artifactNumToKeep: 1000
+      daysToKeep: 60
+      numToKeep: 100
+      artifactDaysToKeep: 60
+      artifactNumToKeep: 100

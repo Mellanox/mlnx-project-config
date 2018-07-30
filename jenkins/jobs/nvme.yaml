@@ -19,7 +19,6 @@
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -37,9 +36,9 @@
     properties:
       - build-discarder:
           days-to-keep: 60
-          num-to-keep: 200
+          num-to-keep: 10
           artifact-days-to-keep: 60
-          artifact-num-to-keep: 200
+          artifact-num-to-keep: 10
     publishers:
       - email-ext:
           recipients: lennyb@mellanox.com
@@ -105,8 +104,11 @@
     builders:
         - shell: |
             #!/bin/bash -x
-            sudo systemctl status devstack@*
-            sleep 30
+            #echo "apply-workarounds-post-stack-NVMe"
+            #if [ -z $ZUUL_CHANGE ]; then
+            #    echo "Skipping NVMe updates"
+            #    exit 0
+            #fi
             exit 0
 
 
@@ -148,12 +150,17 @@
                 phase="RUN-TESTS-attach"
                 pushd $WORKSPACE/devstack
                 status=0
-                . openrc admin
+                . openrc admin admin
                 volume_name=volume_nvme
-                openstack volume create --size 1 $volume_name
+                #openstack volume create --size 1 $volume_name
+                cinder create 1 --name $volume_name
                 image=$(openstack image list|grep "cir"|awk '{print $4}')
+                nova hypervisor-list
+                sleep 20
                 openstack server create --flavor m1.tiny --image $image vm1
+                nova show vm1
                 sleep 240
+                nova show vm1
                 openstack server list
                 openstack volume list
                 echo "Attaching nova volume"
@@ -212,7 +219,6 @@
               project=${project//-/_}
               export ${project^^}_BRANCH=$refspec
             fi
-
             i=1
             export ip1=1.1.1.1
             export ip2=2.2.2.2
@@ -233,10 +239,10 @@
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
             HOST_IP=$(hostname -I | awk '{print $1}')
-
+            FORCE=yes
             RECLONE=yes
             LOG_COLOR=False
-            PIP_UPGRADE=True
+            #PIP_UPGRADE=True
             LOGDIR=${LOGDIR:-/opt/stack/logs}
             LOGFILE=$LOGDIR/stack.sh.log
             LIBS_FROM_GIT=os-brick
@@ -246,9 +252,12 @@
             VOLUME_NAME_PREFIX="volume-"
             VOLUME_BACKING_FILE_SIZE=10250M
 
-            DISABLED_SERVICES=n-net
-            enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
-            disable_service = horizon
+            #enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
+            #disable_service = horizon n-net dstat
+
+            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw etcd3 horizon dstat
+            enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-xvnc n-novnc
+
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -276,7 +285,7 @@
             image_volume_cache_enabled = True
             volume_clear = zero
             lvm_type = default
-            volume_group =  stack-volumes-lvmdriver-1
+            volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-1
             target_ip_address = 1.1.1.1
@@ -290,7 +299,7 @@
             image_volume_cache_enabled = True
             volume_clear = zero
             lvm_type = default
-            volume_group =  stack-volumes-lvmdriver-1
+            volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-2
             target_ip_address = 2.2.2.2

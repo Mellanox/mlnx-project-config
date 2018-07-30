@@ -1,0 +1,122 @@
+- project:
+    name: Build-Kernel
+    node: builder
+    jobs:
+      - 'Build-Kernel'
+
+- job-template:
+    name: 'Build-Kernel'
+    node: '{node}'
+    triggers:
+      - timed: '@monthly'
+    concurrent: false
+    parameters:
+      - string:
+          name: version
+          default: latest
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            PATH=$PATH:/usr/sbin
+            PATH=$PATH:/usr/sbin
+            OUTPUT=/net/mtrlabfs01/vol/QA/qa/qa/cloudx/upstream/kernel/
+      - clean-build-machine
+      - build-kernel
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets check it"
+      - upload-console-log #This line must be the last one
+    wrappers:
+      - timeout:
+          timeout: 380
+          fail: true
+
+
+- builder:
+    name: clean-build-machine
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            mkdir -p /home_stack/kernel_build
+            sudo rm -rf /home_stack/kernel_build/rpmbuild /home_stack/rpmbuild/*
+            sudo rm -rf $LOGDIR
+            mkdir -p $LOGDIR
+
+- builder:
+    name: build-kernel
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            set -o pipefail
+            function version_gt() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
+
+            status=0
+            pushd /home_stack/kernel_build
+            version_to_build=${version}
+            # Evaluate the latest upstream version
+            if [ "$version_to_build" == "latest" ]; then
+                #v=$(lynx --dump https://cdn.kernel.org/pub/linux/kernel/v4.x/ |awk '{print $NF}'|grep patch|grep xz|cut -d'-' -f2|sort -Vr|head -n1)
+                #y=${v%.xz}
+                #version_to_build=$(echo ${y##*/})
+                version_to_build=$( html2text <<< $(wget --output-document - --quiet https://www.kernel.org/ | grep -A 1 "latest_link")|cut -d'[' -f2|cut -d']' -f1)
+                rm -f index.html*
+                echo "Latest version on https://cdn.kernel.org/pub/linux/kernel/v4.x/ is $version_to_build"
+
+                # Evaluate the latest built version
+                #latest=$(basename $(ssh cloudx@13.74.249.42 ls -l /var/www/html/kernel/latest-kernel.src.rpm|awk '{print $NF}'))
+                #latest_built_version=$(echo $latest|cut -d'-' -f2)
+                #echo "********************"
+                latest_built_version=$(ls -l $OUTPUT/latest | awk '{print $NF}' | rev | cut -d'/' -f1|rev)
+                #latest_built_version=$(dirname $(ls -l $OUTPUT/latest-kernel.x86_64.rpm | awk '{print $NF}')|rev | cut -d'/' -f1|rev)
+                echo "latest_built_version=$latest_built_version version_to_build=$version_to_build"
+                if [ ! -z $latest_built_version ]; then
+                    if ! version_gt $version_to_build $latest_built_version; then
+                        echo "$latest_built_version is greater than $version_to_build"
+                        echo "No newer kernels on https://cdn.kernel.org/pub/linux/kernel/v4.x/"
+                        exit 0
+                    fi
+                fi
+
+            fi
+
+            echo "Downloading kernel $version_to_build from https://cdn.kernel.org/pub/linux/kernel/v4.x/"
+            wget $(lynx --dump https://www.kernel.org/|grep ${version_to_build}|grep 'tar.gz'|awk '{print $NF}') 2>&1|tee > /dev/null
+            log=$LOGDIR/kernel-${version_to_build}.log
+            rm -rf linux-*
+            #wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-${version_to_build}.tar.xz 2>&1|tee > /dev/null
+            tar xvf $(ls -1 *${version_to_build}*) 2>&1|tee > /dev/null
+
+            cd *${version_to_build}*
+            sudo scripts/kconfig/merge_config.sh -n /boot/config-$(uname -r)
+            sudo chown -R $(whoami) .
+            for config in "CONFIG_DELL_SMBIOS_WMI=y" "CONFIG_DELL_SMBIOS_SMM=y" "CONFIG_DEVMEM=y"; do
+                echo $config >> .config
+            done
+            echo "Bulding kernel. Log details $NODE_NAME:/$log"
+            pwd
+            echo "make rpm-pkg -j4 > $log"
+            make rpm-pkg -j4 2>&1|tee > $log
+
+            status=$?
+            tail -n300 $log
+            mkdir -p $OUTPUT/$version_to_build
+
+            if [ "$status" -eq 0 ]; then
+                for file in $(tail -n 20 $log|grep 'Wrote:' | awk '{print $2}'); do
+                    cp $file $OUTPUT/$version_to_build
+                done
+                ln -snf $OUTPUT/$version_to_build $OUTPUT/latest
+                rm -rf /home_kernel/linux-${version_to_build}*
+            fi
+            exit $status

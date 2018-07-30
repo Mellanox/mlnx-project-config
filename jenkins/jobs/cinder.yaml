@@ -4,6 +4,13 @@
         - shell: |
             #!/bin/bash -x
             phase="apply-workarounds-post-stack-cinder"
+- builder:
+    name: apply-workarounds-post-stack-Cinder-ISER-ISCSI
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            phase="apply-workarounds-post-stack-cinder"
+            sudo systemctl restart tgtd.service
 
 - builder:
     name: apply-workarounds-pre-stack-cinder
@@ -57,7 +64,7 @@
             export ip2=2.2.2.2
 
             for pci in $(lspci |grep $HCA | grep -v Virtual | awk '{print $1}');do
-                for p in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}');do
+                for p in $(ls -lr /sys/class/net/|grep $pci | awk '{print $9}');do
                     sudo ifconfig $p $i.$i.$i.$i/24 up
                     let i=i+1
                 done
@@ -70,11 +77,11 @@
               export ${project^^}_BRANCH=$refspec
             fi
 
-            if [ $ZUUL_BRANCH == 'stable/pike' ]; then
-                export target='iscsi'
-            else
-                export target='target'
-            fi
+            #if [ "$ZUUL_BRANCH" == 'stable/pike' ]; then
+            #    export target='iscsi'
+            #else
+            #    export target='target'
+            #fi
 
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
@@ -84,7 +91,7 @@
             RABBIT_PASSWORD=password
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
-
+            FORCE=yes
             HOST_IP=$(host $(hostname) | cut -d' ' -f4)
 
             RECLONE=yes
@@ -99,10 +106,8 @@
             VOLUME_NAME_PREFIX="volume-"
             VOLUME_BACKING_FILE_SIZE=10250M
 
-            #disable_service=horizon
-            DISABLED_SERVICES=n-net
             enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
-            disable_service = horizon
+            disable_service = horizon dstat n-net
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -125,21 +130,21 @@
             [[post-config|/etc/cinder/cinder.conf]]
             [DEFAULT]
             enabled_backends=lvmdriver-1,backend1
-            ${target}_helper=$CINDER_PROTOCOL
+            target_helper=$CINDER_PROTOCOL
 
             [lvmdriver-1]
-            ${target}_helper = $CINDER_PROTOCOL
-            ${target}_protocol = iser
-            ${target}_ip_address = $ip1
+            target_helper = $CINDER_PROTOCOL
+            target_protocol = iser
+            target_ip_address = $ip1
             lvm_type = default
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
             volume_backend_name = lvmdriver-1
 
             [backend1]
-            ${target}_helper = $CINDER_PROTOCOL
-            ${target}_ip_address = $ip2
-            ${target}_protocol = iser
+            target_helper = $CINDER_PROTOCOL
+            target_ip_address = $ip2
+            target_protocol = iser
             lvm_type = default
             volume_group = stack-volumes-lvmdriver-1
             volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
@@ -157,6 +162,7 @@
     name: Cinder-ISER-ISCSI
     github-org: openstack-dev
     node: CINDER
+    concurrent: True
     jobs:
         - 'Cinder-ISER-ISCSI'
 
@@ -164,6 +170,7 @@
     name: Cinder-ISER-LIO
     github-org: openstack-dev
     node: CINDER
+    concurrent: True
     jobs:
         - 'Cinder-ISER-LIO'
 
@@ -193,6 +200,7 @@
 - job-template:
     name: 'Cinder-ISER-ISCSI'
     node: '{node}'
+    concurrent: True
     builders:
       - inject:
           properties-content: |
@@ -202,7 +210,6 @@
             HCA=MT277
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
             CINDER_PROTOCOL=tgtadm
       - check-environment
       - mlnx-project-config
@@ -210,9 +217,11 @@
       - clone-devstack
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
+      - apply-workarounds-pre-stack-cinder
       - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
+      - apply-workarounds-post-stack-{name}
       - apply-workarounds-post-stack
       - run-tests-attach-volume
       - run-tests-cinder
@@ -247,7 +256,6 @@
             HCA=mlx5
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -289,7 +297,6 @@
             HCA=mlx5
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -332,7 +339,6 @@
 #            IMAGE_SERVER=13.74.249.42
 #            PATH=$PATH:/usr/sbin
 #            SIMX_SNAPSHOT=Simx2.4-2359_20170214
-#            FORCE=yes
 #      - load-vm
 #      - waitforonline-vm
 #      - produce-readme-file
@@ -357,6 +363,7 @@
 - job-template:
     name: 'Cinder-ISER-LIO'
     node: '{node}'
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -367,7 +374,6 @@
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             CINDER_PROTOCOL=lioadm
-            FORCE=yes
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -378,8 +384,8 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
       - apply-workarounds-post-stack
-      - run-tests-cinder
       - run-tests-attach-volume
+      - run-tests-cinder
       - produce-readme-file
     properties:
       - build-discarder:
@@ -408,7 +414,7 @@
 #    node: cloudx-17
 #    concurrent: false
 #    triggers:
-#      - timed: 'H 0 * * *'
+#      - timed: '@daily'
 #    builders:
 #       - multijob:
 #           name: SimX-Run-VM
@@ -418,7 +424,6 @@
 #                current-parameters: true
 #                predefined-parameters: |
 #                   HCA=MT27700
-#                   FORCE=yes
 #                   SIMX_VM=cloudx-17-07
 #       - multijob:
 #           name: SimX-Run-ISER-LIO
@@ -428,7 +433,6 @@
 #                current-parameters: true
 #                predefined-parameters: |
 #                   HCA=MT27700
-#                   FORCE=yes
 #    properties:
 #      - build-discarder:
 #          days-to-keep: 70
@@ -445,7 +449,7 @@
 #    node: cloudx-17
 #    concurrent: false
 #    triggers:
-#      - timed: 'H 0 * * *'
+#      - timed: '@daily'
 #    builders:
 #       - multijob:
 #           name: Simx-ISCSI
@@ -455,7 +459,6 @@
 #                current-parameters: true
 #                predefined-parameters: |
 #                   HCA=MT27700
-#                   FORCE=yes
 #                   SIMX_VM=cloudx-17-04
 #       - multijob:
 #           name: SimX-Run-ISER-ISCSI
@@ -465,7 +468,6 @@
 #                current-parameters: true
 #                predefined-parameters: |
 #                   HCA=MT27700
-#                   FORCE=yes
 #    properties:
 #      - build-discarder:
 #          days-to-keep: 70
@@ -481,7 +483,7 @@
     name: run-tests-cinder
     builders:
       - shell: |
-                #!/bin/bash -x
+                #!/bin/bash +ex
                 echo "============ Starting tempest tests ====================="
                 tests=(
                        #tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
@@ -495,11 +497,19 @@
                        tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest
                        tempest.api.volume.admin.test_volume_types_extra_specs_negative
                 )
+                tempest_cmd="stestr"
+                #[ "$ZUUL_BRANCH" ] && [[ $ZUUL_BRANCH == 'stable/pike' ]] && tempest_cmd="testr"
                 cd /opt/stack/tempest
-                sudo pip install stestr
+                #$tempest_cmd init
                 stestr init
+                #$tempest_cmd stestr list ${tests[@]}
+                virtualenv virt --no-site-packages
+                . virt/bin/activate
+                virt/bin/pip install -U -r requirements.txt
+                #$tempest_cmd run ${tests[@]}
                 stestr run ${tests[@]}
                 test_pass=$?
+                deactivate
 
                 if [[ $test_pass -ne 0 ]]; then
                     echo "FINISHED with ERROR: ############## $phase  ###################"
@@ -610,7 +620,7 @@
             pprint(os.environ)
             phase="Waiting for Online status of %s" % SIMX_VM
             print phase
-            url = 'http://10.224.33.37:8080/computer/%s/api/json' % SIMX_VM
+            url = 'http://10.212.19.4:8080/computer/%s/api/json' % SIMX_VM
             start = time.time()
             print "Started", start
             print "Time", time.time()

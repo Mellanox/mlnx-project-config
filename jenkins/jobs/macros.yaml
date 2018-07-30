@@ -9,10 +9,10 @@
 
             rm -f $log_file $arch
             cd $WORKSPACE
-            [ -f grab_console_log.sh ] && rm -f grab_console_log.sh
-            wget https://raw.githubusercontent.com/midonet/openstack-project-config/master/jenkins/scripts/grab_console_log.sh
-            #wget https://raw.githubusercontent.com/open-switch/infra_project-config/master/jenkins/scripts/grab_console_log.sh
-            bash ./grab_console_log.sh 2>&1|tee
+            [ -f grab_console_log.sh ] && rm -f grab_console_log.sh && rm -f /tmp/grab_console_log.log
+            #wget https://raw.githubusercontent.com/midonet/openstack-project-config/master/jenkins/scripts/grab_console_log.sh
+            wget https://raw.githubusercontent.com/open-switch/infra_project-config/master/jenkins/scripts/grab_console_log.sh
+            bash -x ./grab_console_log.sh 2>&1|tee > /tmp/grab_console_log.log
             [ ! -f $log_file ] && bash ./grab_console_log.sh
             cat $log_file | grep 'marked build as failure'
             if [ $? -ne 0 ]; then

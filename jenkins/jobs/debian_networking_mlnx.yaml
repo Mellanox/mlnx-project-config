@@ -13,7 +13,7 @@
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
-            HCA=MT27710
+            HCA=MT27
             PATH=$PATH:/usr/sbin
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
@@ -52,20 +52,23 @@
             try:
                 jenkinsUrl = os.environ['UBUNTUURL']
             except:
-                jenkinsUrl = "https://stretch-queens.debian.net/job/"
-            jobName="networking-mlnx"
+                jenkinsUrl = 'https://stretch-rocky.debian.net/job/'
+
+            jobName = "networking-mlnx"
             jobNameURL = urllib.quote(jobName)
             try:
-                jenkinsStream   = urllib2.urlopen( jenkinsUrl + jobNameURL + "/lastBuild/api/json" )
-            except urllib2.HTTPError, e:
+                url = "%s/%s/lastBuild/api/json" % (jenkinsUrl, jobNameURL)
+                print "Opening %s" % url
+                jenkinsStream   = urllib2.urlopen(url)
+            except Exception as e:
                 print "URL Error: " + str(e.code)
                 print "      (job name [" + jobName + "] probably wrong)"
                 sys.exit(2)
 
             try:
                buildStatusJson = json.load( jenkinsStream )
-            except:
-               print "Failed to parse json"
+            except Exception as e:
+               print "Failed to parse json %s" % e
                sys.exit(3)
 
             if buildStatusJson.has_key( "result" ):
