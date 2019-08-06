@@ -1,62 +1,33 @@
 - job-template:
-    name: 'Nova-ML2-Sriov'
+    name: Nova-ML2-Sriov
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
+            HCA=MT277|MT278
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=direct
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-      #- 'run-tests-{name}-API'
-      - run-tests-network-basic
-      - run-tests-network-advanced
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 100
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 10
-    publishers:
-      - email-ext:
-          recipients: lennyb@mellanox.com
-          subject: Failed Mellanox CI {name}
-          failure: true
-          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
-      - upload-console-log #This line must be the last one
-
-
-- job-template:
-    name: 'Nova-MACVTAP-ML2-Sriov'
-    node: '{node}'
-    concurrent: true
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.74.249.42
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
-            IMAGE_SERVER=13.74.249.42
-            PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-Nova-MACVTAP-ML2-Sriov
+      - configure-devstack-local-conf
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-direct
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - run-tests-network-basic
@@ -78,25 +49,38 @@
 
 
 - job-template:
-    name: 'Tempest-Sriov'
+    name: Nova-MACVTAP-ML2-Sriov
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
+            HCA=MT277|MT278
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=macvtap
+      - clean-environment
       - check-environment
       - mlnx-project-config
-      - clean-environment
+      #- clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-Nova-ML2-Sriov
-      #- configure-devstack-{name}
+      #- configure-devstack-Nova-MACVTAP-ML2-Sriov
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-sriov
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-macvtap
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - run-tests-network-basic
@@ -118,9 +102,66 @@
 
 
 - job-template:
-    name: 'Neutron-ML2-MLNX'
+    name: Tempest-Sriov
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=MT277|MT278
+            IMAGE_SERVER=13.74.249.42
+            PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=direct
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-sriov
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-direct
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - run-sanity-check
+      - run-tests-network-basic
+      - run-tests-network-advanced
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 10
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log #This line must be the last one
+
+
+- job-template:
+    name: Neutron-ML2-MLNX
+    node: '{node}'
+    concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
@@ -130,15 +171,23 @@
             HCA=MT27520
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=direct
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      #- configure-devstack-{name}
+      - configure-devstack-local-conf
+      - configure-devstack-local-conf-sriov-ib-common
+      - configure-devstack-local-conf-sriov-ib-mlnx
+      - configure-devstack-local-conf-sriov-ib-post-common
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
-      - 'run-tests-{name}'
+      - run-sanity-check
+      - run-tests-Neutron-Networking-MLNX-ML2
+      #- 'run-tests-{name}'
       - produce-readme-file
     properties:
       - build-discarder:
@@ -156,24 +205,37 @@
 
 
 - job-template:
-    name: 'Neutron-MACVTAP-ML2-Sriov'
+    name: Neutron-MACVTAP-ML2-Sriov
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
+            HCA=MT277|MT278
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=macvtap
+      - clean-environment
       - check-environment
       - mlnx-project-config
-      - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      #- configure-devstack-{name}
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-sriov
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-macvtap
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       #- 'run-tests-{name}-API'
@@ -196,24 +258,37 @@
 
 
 - job-template:
-    name: 'Neutron-ML2-Sriov'
+    name: Neutron-ML2-Sriov
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
+            HCA=MT277|MT278
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=direct
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      #- configure-devstack-{name}
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-sriov
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-direct
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       #- 'run-tests-{name}-API'
@@ -235,10 +310,14 @@
           body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - upload-console-log  #This line must be the last one
 
-
 - job-template:
-    name: 'Neutron-Networking-MLNX-ML2'
+    name: Networking-MLNX-EPY27
     node: '{node}'
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
@@ -248,15 +327,11 @@
             HCA=MT27520
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
-      - check-environment
+            GIT_BASE=https://review.opendev.org
+            PROJECT=https://review.opendev.org/x/networking-mlnx
       - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-{name}
-      - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
-      - 'run-tests-{name}'
+      - clone-project
+      - epy27
       - produce-readme-file
     properties:
       - build-discarder:
@@ -274,20 +349,114 @@
 
 
 - job-template:
-    name: 'NOOP'
+    name: Networking-MLNX-PEP8
     node: '{node}'
-    concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27
+            HCA=MT27520
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PROJECT=https://review.opendev.org/x/networking-mlnx
       - mlnx-project-config
-      - noop-run
+      - clone-project
+      - pep8
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 10
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log  #This line must be the last one
+
+
+- job-template:
+    name: Neutron-Networking-MLNX-ML2
+    node: '{node}'
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=MT27520
+            IMAGE_SERVER=13.74.249.42
+            PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=direct
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      #- configure-devstack-{name}
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-sriov-networking-mlnx
+      - configure-devstack-local-conf-sriov-ib-common
+      - configure-devstack-local-conf-sriov-ib-sdn
+      - configure-devstack-local-conf-sriov-ib-post-common
+      - configure-devstack-local-conf-sriov-ib-post-sdn
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - run-sanity-check
+      - run-tests-Neutron-Networking-MLNX-ML2
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 10
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log  #This line must be the last one
+
+
+- job-template:
+    name: NOOP
+    node: '{node}'
+    concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            HCA=MT277|MT278
+            IMAGE_SERVER=13.74.249.42
+            PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+      - mlnx-project-config
       - produce-readme-file
     properties:
       - build-discarder:
@@ -305,60 +474,70 @@
 
 
 - job:
-    name: Mellanox-CI-Daily-StableQueens-Status
+    name: Mellanox-CI-Daily-Stablestein-Status
     project-type: multijob
     node:  daily
+    concurrent: false
     triggers:
       - timed: '@daily'
     builders:
       - multijob:
-           name: Mellanox-CI-Daily-StableQueens-Status
+           name: Mellanox-CI-Daily-Stablestein-Status
            condition: ALWAYS
            projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/stein
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/stein
               - name: Nova-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Nova-MACVTAP-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Tempest-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Neutron-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Neutron-ML2-MLNX
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Neutron-Networking-MLNX-ML2
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Cinder-ISER-LIO
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
+                   ZUUL_BRANCH=stable/stein
               - name: Cinder-ISER-ISCSI
                 current-parameters: true
                 predefined-parameters: |
-                   ZUUL_BRANCH=stable/queens
-              #- name: OVS_HW_offload
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/queens
-              #- name: OVS_HW_offload_Neutron
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     ZUUL_BRANCH=stable/queens
-              - name: DEBIAN_PACKAGE_CHECK
+                   ZUUL_BRANCH=stable/stein
+              - name: OVS_HW_offload
                 current-parameters: true
                 predefined-parameters: |
-                   UBUNTUURL=https://stretch-queens.debian.net/job
+                   ZUUL_BRANCH=stable/stein
+              - name: OVS_HW_offload_Neutron
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/stein
+              #- name: DEBIAN_PACKAGE_CHECK
+              #  current-parameters: true
+              #  predefined-parameters: |
+              #     UBUNTUURL=https://stretch-stein.debian.net/job
+
 
     properties:
       - build-discarder:
@@ -375,6 +554,7 @@
     name: Mellanox-CI-Daily-Stablerocky-Status
     project-type: multijob
     node:  daily
+    concurrent: false
     triggers:
       - timed: '@daily'
     builders:
@@ -382,6 +562,14 @@
            name: Mellanox-CI-Daily-Stablerocky-Status
            condition: ALWAYS
            projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/rocky
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/rocky
               - name: Nova-ML2-Sriov
                 current-parameters: true
                 predefined-parameters: |
@@ -414,7 +602,6 @@
                 current-parameters: true
                 predefined-parameters: |
                    UBUNTUURL=https://stretch-rocky.debian.net/job
-
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -430,6 +617,9 @@
     name: Mellanox-CI-Daily-Master-Status
     project-type: multijob
     node:  daily
+    predefined-parameters: |
+        ZUUL_BRANCH=master
+    concurrent: false
     triggers:
       - timed: '@daily'
     builders:
@@ -437,10 +627,13 @@
            name: Mellanox-CI-Daily-Master-Status
            condition: ALWAYS
            projects:
+              - name: Networking-MLNX-PEP8
+              - name: Networking-MLNX-EPY27
+              - name: OVS_DPDK
               - name: Nova-ML2-Sriov
                 current-parameters: true
-              - name: Nova-MACVTAP-ML2-Sriov
-                current-parameters: true
+              #- name: Nova-MACVTAP-ML2-Sriov
+              #  current-parameters: true
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
@@ -455,12 +648,14 @@
                 current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
-              - name: Neutron-MACVTAP-ML2-Sriov
-                current-parameters: true
+              #- name: Neutron-MACVTAP-ML2-Sriov
+              #  current-parameters: true
               - name: OVS_HW_offload
                 current-parameters: true
               - name: OVS_HW_offload_Neutron
                 current-parameters: true
+              #- name: SPDK
+              #  current-parameters: true
               #- name: DEBIAN_PACKAGE_CHECK
               #  current-parameters: true
               #  predefined-parameters: |
@@ -479,29 +674,39 @@
 ###               MULTI NODE CI     ##################
 ######################################################
 - job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Controller'
+    name: Nova-ML2-Sriov-Multinode-Controller
     node: '{node}'
     concurrent: false
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: false
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27800
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      - configure-devstack-local-conf
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov
+      - configure-devstack-local-conf-port
+      #- configure-devstack-local-conf-direct
       - run-stacksh
       - apply-workarounds-post-stack
-      - apply-workarounds-post-stack-{name}
-      - apply-workarounds-tempest
+      #- apply-workarounds-post-stack-{name}
+      #- apply-workarounds-tempest
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -513,28 +718,37 @@
 
 
 - job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Compute'
+    name: Nova-ML2-Sriov-Multinode-Compute
     node: '{node}'
     concurrent: false
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: false
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
-            HCA=MT27800
+            HCA=MT27
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
       - apply-workarounds-pre-stack
-      - configure-devstack-{name}
+      - configure-devstack-local-conf
+      #- configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-neutron-sriov-compute
+      - configure-devstack-local-conf-neutron-sriov
+      #- configure-devstack-local-conf-direct
       - run-stacksh
       - apply-workarounds-post-stack
-      - apply-workarounds-post-stack-{name}
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -546,9 +760,14 @@
 
 
 - job-template:
-    name: 'Nova-ML2-Sriov-Multinode-Tempest'
+    name: Nova-ML2-Sriov-Multinode-Tempest
     node: '{node}'
     concurrent: false
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: false
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
@@ -559,6 +778,7 @@
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=CONTROLLER
+            GIT_BASE=https://review.opendev.org
       - mlnx-project-config
       - run-tests-multinode
       - stop-stacksh
@@ -573,7 +793,7 @@
 
 
 - job-template:
-    name: 'Nova-ML2-Sriov-Multinode-StopCompute'
+    name: Nova-ML2-Sriov-Multinode-StopCompute
     node: '{node}'
     concurrent: false
     parameters:
@@ -587,6 +807,7 @@
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             NODE_TYPE=COMPUTE
+            GIT_BASE=https://review.opendev.org
        - stop-stacksh
     properties:
       - build-discarder:
@@ -616,7 +837,7 @@
            projects:
               - name: Nova-ML2-Sriov-Multinode-Compute
                 current-parameters: true
-                predefined-parameters: CONTROLLER_NODE=10.209.32.15
+                predefined-parameters: CONTROLLER_NODE=r-dcs92
        - multijob:
            name: Tempest
            condition: SUCCESSFUL
@@ -635,3 +856,61 @@
           num-to-keep: 100
           artifact-days-to-keep: 70
           artifact-num-to-keep: 10
+
+- job:
+    name: Networking-MLNX-PEP8-PY27
+    project-type: multijob
+    node:  daily
+    concurrent: false
+    triggers:
+      - timed: '@daily'
+    builders:
+      - multijob:
+           name: Networking-MLNX-PEP8-PY27-Master
+           condition: ALWAYS
+           projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=master
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=master
+
+      - multijob:
+           name: Networking-MLNX-PEP8-PY27-Stein
+           condition: ALWAYS
+           projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/stein
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/stein
+
+      - multijob:
+           name: Networking-MLNX-PEP8-PY27-Rocky
+           condition: ALWAYS
+           projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/rocky
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/rocky
+
+
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 10
+    wrappers:
+      - timeout:
+          timeout: 500

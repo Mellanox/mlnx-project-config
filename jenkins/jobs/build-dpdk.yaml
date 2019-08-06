@@ -7,8 +7,8 @@
 - job-template:
     name: 'Build-DPDK'
     node: '{node}'
-    triggers:
-      - timed: '@monthly'
+    #triggers:
+    #  - timed: '@monthly'
     concurrent: false
     parameters:
       - string:
@@ -16,7 +16,7 @@
           default: latest
       - string:
           name: ovs_branch
-          default: branch-2.10
+          default: branch-2.11
 
 
     builders:
@@ -29,7 +29,7 @@
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
             #OUTPUT=/tmp/lny/20181009
-            OUTPUT=/net/mtrlabfs01/vol/QA/qa/qa/cloudx/upstream/ovs
+            OUTPUT=/net/r1/vol/QA/qa/qa/cloudx/build/ovs
       #- clean-build-machine
       - build-dpdk
       - produce-readme-file
@@ -57,35 +57,29 @@
     builders:
         - shell: |
             #!/bin/bash -x
+            set -eux
             set -o pipefail
+
+            run_date=$(date +"%F-%H-%M")
             function version_gt() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
 
             status=0
             pushd /home_stack
-            rm -rf dpdk* ovs* index.html
+            rm -rf dpdk ovs index.html
             version_to_build=${dpdk_version}
 
             wget http://docs.openvswitch.org/en/latest/intro/install/dpdk/ 2>&1|tee > /dev/null
             # Evaluate the latest upstream version
             if [ "$version_to_build" == "latest" ]; then
                 version_to_build=$(html2text index.html |grep '* DPDK'|awk '{print $NF}')
-                if [ -d $OUTPUT/latest ]; then
-                    echo "Latest version on http://docs.openvswitch.org/en/latest/intro/install/dpdk/ is $version_to_build"
-                    latest_built_version=$(basename $(ls $OUTPUT/latest/dpdk-*.centos.x86_64.rpm|head -n1)|cut -d'-' -f2)
-                    echo "latest_built_version=$latest_built_version version_to_build=$version_to_build"
-                    if [ "$latest_built_version" != "" ]; then
-                        if ! version_gt $version_to_build $latest_built_version; then
-                            echo "$latest_built_version is greater than $version_to_build"
-                            echo "No newer kernels on https://cdn.kernel.org/pub/linux/kernel/v4.x/"
-                        fi
-                    fi
-                fi
             fi
 
             ovs_version=$(echo $ovs_branch|cut -d'-' -f2)
             wget $(html2text index.html |grep tar.xz|grep wget|awk '{print $NF}') 2>&1|tee > /dev/null
-            sudo mkdir -p /root/rpmbuild/SOURCES/
-            sudo mv dpdk*.tar.xz /root/rpmbuild/SOURCES/
+            rm -fr ~/rpmbuild/SOURCES/*
+            rm -fr ~/rpmbuild/RPMS/*
+            rm -fr ~/rpmbuild/SRPMS/*
+            mv dpdk*.tar.xz ~/rpmbuild/SOURCES/
 
             git clone https://src.fedoraproject.org/git/rpms/dpdk.git
             cd dpdk/
@@ -96,43 +90,54 @@
 
             cur_ver=$(cat /home_stack/dpdk/dpdk.spec |grep Version)
             sed -i "s/$cur_ver/Version: $version_to_build/g" dpdk.spec
-            #sed -i '/Epoch/d' dpdk.spec
-            #sed -i '/Version:/aEpoch: 44' dpdk.spec
+            sed -i "s/stable-//g" dpdk.spec
+            sed -i '/Epoch/d' dpdk.spec
+            sed -i '/Version:/aEpoch: 44' dpdk.spec
 
             sed -i 's/python3-sphinx/python-sphinx/g' dpdk.spec
             sed -i 's/Requires: %{name}%{?_isa} = %{epoch}:%{version}-%{release} python3/Requires: %{name}%{?_isa} = %{epoch}:%{version}-%{release} python/g' dpdk.spec
+            sed -i 's/python3-pyelftools/python-pyelftools/g' dpdk.spec
+            sed -i 's/testpmd/testpmd\n%{_bindir}\/testbbdev/g' dpdk.spec
+
             sed -i 's/# Enable automatic driver loading from this path/# Enable automatic driver loading from this path\nsetconf CONFIG_RTE_LIBRTE_MLX4_PMD y\nsetconf CONFIG_RTE_LIBRTE_MLX5_PMD y/g' dpdk.spec
 
-            sudo cp *.patch /root/rpmbuild/SOURCES/
+            cp *.patch ~/rpmbuild/SOURCES/
 
-            log=$LOGDIR/kernel-${version_to_build}.log
-            sudo rpmbuild -ba dpdk.spec 2>&1|tee > $log
+            xz -dc ~/rpmbuild/SOURCES/dpdk-${version_to_build}.tar.xz | /usr/bin/tar -xf -
+            mv dpdk-stable-${version_to_build} dpdk-${version_to_build}
+            tar cf - dpdk-${version_to_build}| xz -z - > /tmp/dpdk-${version_to_build}.tar.xz
+            mv /tmp/dpdk-${version_to_build}.tar.xz ~/rpmbuild/SOURCES/dpdk-${version_to_build}.tar.xz
 
-            sudo sh -c 'rm -f /root/rpmbuild/RPMS/x86_64/dpdk-tools-*'
-            sudo sh -c 'rm -f /root/rpmbuild/RPMS/x86_64/dpdk-examples-*'
-            sudo sh -c 'rm -f /root/rpmbuild/RPMS/x86_64/dpdk-debuginfo-*'
-            sudo yum remove -y $(rpm -qa|grep dpdk)
-            sudo sh -c 'sudo yum install -y /root/rpmbuild/RPMS/x86_64/dpdk-*'
+            rpmbuild -ba dpdk.spec
 
-            sudo mkdir -p $OUTPUT/$ovs_version
-            sudo sh -c "cp /root/rpmbuild/RPMS/*/*dpdk* $OUTPUT/$ovs_version"
+            sudo yum remove -y $(rpm -qa | grep dpdk | tr '\n' ' ') || true
+            sudo yum install -y $(ls ~/rpmbuild/RPMS/x86_64/dpdk*)
 
             cd /home_stack/
-            git clone https://github.com/openvswitch/ovs.git
+            git clone --single-branch --branch $ovs_branch https://github.com/openvswitch/ovs.git
             cd ovs
-            git checkout origin/$ovs_branch -b $ovs_branch
             sed -e 's/@VERSION@/0.0.1/' rhel/openvswitch-fedora.spec.in > /tmp/ovs.spec
             sudo yum-builddep -y /tmp/ovs.spec
 
+            # Add Obsoletes's for removing RHEL packages
             sed -i -e 's/-n %{_py2}-openvswitch/-n python2-openvswitch/g' rhel/openvswitch-fedora.spec.in
             sed -i '/Version:/aEpoch: 44' rhel/openvswitch-fedora.spec.in
+            sed -i '/^%description$/iObsoletes: openvswitch2.11\nObsoletes: openvswitch2.10\nObsoletes: openvswitch2.9\nObsoletes: rhosp-openvswitch\n' rhel/openvswitch-fedora.spec.in
+            sed -i '/^%description -n python2-openvswitch$/iObsoletes: python-openvswitch2.11\nObsoletes: python-openvswitch2.10\nObsoletes: python-openvswitch2.9\nObsoletes: python-rhosp-openvswitch\n' rhel/openvswitch-fedora.spec.in
+            sed -i '/^%description$/iObsoletes: ovn2.11\nObsoletes: ovn2.10\nObsoletes: ovn2.9\n' rhel/ovn-fedora.spec.in
+            sed -i '/^%description central$/iObsoletes: ovn2.11-central\nObsoletes: ovn2.10-central\nObsoletes: ovn2.9-central\nObsoletes: rhosp-openvswitch-ovn-central\n' rhel/ovn-fedora.spec.in
+            sed -i '/^%description host$/iObsoletes: ovn2.11-host\nObsoletes: ovn2.10-host\nObsoletes: ovn2.9-host\nObsoletes: rhosp-openvswitch-ovn-host\n' rhel/ovn-fedora.spec.in
+
             ./boot.sh
             ./configure
             make rpm-fedora RPMBUILD_OPT="--with dpdk --without check"
-            mkdir -p $OUTPUT/$ovs_version
-            cp rpm/rpmbuild/RPMS/*/*openvswitch* $OUTPUT/$ovs_version
-            cp rpm/rpmbuild/RPMS/x86_64/* $OUTPUT/$ovs_version
-            cp rpm/rpmbuild/RPMS/noarch/* $OUTPUT/$ovs_version
-            ln -snf $OUTPUT/$ovs_version $OUTPUT/latest
+            make rpm-fedora-ovn RPMBUILD_OPT="--with dpdk --without check"
+
+            # Copy RPM's
+            umask 000; mkdir -m 0777 -p $OUTPUT/$ovs_version/${run_date}
+            cp ~/rpmbuild/RPMS/*/* $OUTPUT/$ovs_version/${run_date}
+            cp rpm/rpmbuild/RPMS/*/* $OUTPUT/$ovs_version/${run_date}
+            rm -f ~/rpmbuild/RPMS/*/*
+            ln -snf $OUTPUT/${ovs_version}/${run_date} $OUTPUT/latest_ovs_${ovs_version}
 
             exit $?

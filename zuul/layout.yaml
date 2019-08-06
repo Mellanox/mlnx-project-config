@@ -18,26 +18,37 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Neutron CI merge
 
-#  - name: check-mlnx-multinode
-#    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
-#    failure-message: Build failed. To re-run the job please post a comment with 'recheck multinode-mlnx'.
-#    footer-message: To re-run the job post 'recheck multinode-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
-#    manager: IndependentPipelineManager
-#    precedence: low
-#    trigger:
-#      gerrit:
-#        - event: patchset-created
-#        - event: change-restored
-#        - event: comment-added
-#          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( multinode-mlnx))\s*$
+  - name: check-mlnx-multinode
+    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
+    failure-message: Build failed. To re-run the job please post a comment with 'recheck multinode-mlnx'.
+    footer-message: To re-run the job post 'recheck multinode-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
+    manager: IndependentPipelineManager
+    precedence: low
+    trigger:
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( multinode-mlnx))\s*$
 #Remark for silent mode
-#    success:
-#      gerrit:
-#        verified: 1
-#    failure:
-#      gerrit:
-#        verified: 0
+    success:
+      gerrit:
+        verified: 1
+    failure:
+      gerrit:
+        verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox MultiNode CI merge
+
 
   - name: check-cinder
     description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
@@ -58,6 +69,11 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Cinder CI merge
 
 
   - name: check-nova
@@ -79,19 +95,24 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Nova CI merge
 
-#  - name: check-ironic-ib
-#    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
-#    failure-message: Build failed. To re-run the job please post a comment with 'recheck ironic-ib-mlnx'.
-#    footer-message: To re-run the job post 'recheck ironic-ib-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
-#    manager: IndependentPipelineManager
-#    precedence: low
-#    trigger:
-#      gerrit:
-#        - event: patchset-created
-#        - event: change-restored
-#        - event: comment-added
-#          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( nova-mlnx))\s*$
+  - name: check-ironic-ib
+    description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
+    failure-message: Build failed. To re-run the job please post a comment with 'recheck ironic-ib-mlnx'.
+    footer-message: To re-run the job post 'recheck ironic-ib-mlnx' comment. For more information visit https://wiki.openstack.org/wiki/ThirdPartySystems/Mellanox_CI
+    manager: IndependentPipelineManager
+    precedence: low
+    trigger:
+      gerrit:
+        - event: patchset-created
+        - event: change-restored
+        - event: comment-added
+          comment: (?i)^(Patch Set [0-9]+:)?( [\w\\+-]*)*(\n\n)?\s*recheck(( (?:bug|lp)[\s#:]*(\d+))|( no bug)|( nova-mlnx))\s*$
 #Remark for silent mode
 #    success:
 #      gerrit:
@@ -99,6 +120,11 @@ pipelines:
 #    failure:
 #      gerrit:
 #        verified: 0
+#    merge-failure:
+#      smtp:
+#        to: openstack_ci@mellanox.com
+#        from: zuul@10.224.33.37
+#        subject: Upstream {change} failed Mellanox Nova CI merge
 
 
   - name: check-sriov-tempest
@@ -120,6 +146,11 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Tempest CI merge
 
   - name: check-networking-mlnx
     description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
@@ -140,6 +171,11 @@ pipelines:
     failure:
       gerrit:
         verified: -1
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Networking CI merge
 
 
   - name: check-sandbox
@@ -160,6 +196,11 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Neutron CI merge
 
   - name: check-os-vif
     description: Newly uploaded patchsets enter this pipeline to receive an +/-1 Verified vote from MLNX Jenkins.
@@ -180,11 +221,16 @@ pipelines:
     failure:
       gerrit:
         verified: 0
+    merge-failure:
+      smtp:
+        to: openstack_ci@mellanox.com
+        from: zuul@10.224.33.37
+        subject: Upstream {change} failed Mellanox Neutron CI merge
 
 
 jobs:
   - name: Neutron-ML2-Sriov
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -204,9 +250,10 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
   - name: Neutron-MACVTAP-ML2-Sriov
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -226,10 +273,11 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/plugins/ml2/drivers/mlnx/.*$
 
 
   - name: Neutron-ML2-MLNX
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka/stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -249,6 +297,7 @@ jobs:
           - ^neutron/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/plugins/ml2/drivers/mech_sriov/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/brocade/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/freescale/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/hyperv/.*$
@@ -260,10 +309,11 @@ jobs:
           - ^neutron/tests/unit/plugins/ml2/drivers/opendaylight/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/openvswitch/.*$
           - ^neutron/tests/unit/plugins/ml2/drivers/ovsvapp/.*$
+          - ^neutron/tests/unit/plugins/ml2/drivers/mech_sriov/.*$
 
 
   - name: Neutron-Networking-MLNX-ML2
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
     voting: true
     skip-if:
       - all-files-match-any:
@@ -275,7 +325,7 @@ jobs:
 
 
   - name: Nova-ML2-Sriov
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -302,7 +352,7 @@ jobs:
           - ^tox.ini$
 
   - name: Nova-MACVTAP-ML2-Sriov
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
     voting: false
     skip-if:
       - all-files-match-any:
@@ -318,17 +368,12 @@ jobs:
           - ^tox.ini$
 
   - name: Tempest-Sriov
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: master
     voting: false
     files:
-      - ^tempest/scenario/manager.py
-      - ^tempest/config.py
-    skip-if:
-      - all-files-match-any:
-          - ^.*\.rst$
-          - ^doc/.*$
-          - ^tox.ini$
-
+      - '^tempest/scenario/.*$'
+      - '^tempest/common/.*$'
+      - '^tempest/.*$'
 
   - name: Nova-ML2-Sriov-Multinode
     branch: ^(master).*$
@@ -339,11 +384,6 @@ jobs:
       - '^nova/scheduler/filters/numa_topology_filter.py'
       - '^nova/scheduler/filters/pci_passthrough_filter.py'
       - '^nova/compute/.*$'
-    skip-if:
-      - all-files-match-any:
-          - ^.*\.rst$
-          - ^doc/.*$
-          - ^tox.ini$
 
 
   - name: NOOP
@@ -351,43 +391,25 @@ jobs:
 
   - name: Cinder-ISER-ISCSI
     voting: true
-    branch: ^(master|stable/rocky|stable/queens).*$
+<<<<<<< Updated upstream
+    branch: ^(master).*$
 
   - name: Cinder-ISER-LIO
     voting: true
-    branch: ^(master|stable/rocky|stable/queens).*$
+    branch: ^(master).*$
+=======
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
+
+  - name: Cinder-ISER-LIO
+    voting: true
+    branch: ^(master|stable/ocata|stable/mitaka|stable/newton).*$
+>>>>>>> Stashed changes
 
   - name: OVS_HW_offload
     voting: false
-    branch: ^(master|stable/rocky|stable/queens).*$
-    skip-if:
-      - all-files-match-any:
-          - ^.*\.rst$
-          - ^doc/.*$
-          - ^tox.ini$
-
-  - name: OVS_HW_offload_Neutron
-    branch: ^(master|stable/rocky|stable/queens).*$
-    voting: false
+    branch: ^(master).*$
     files:
-      - '^devstack/lib/ovs*$'
-
-  - name: NVMe
-    voting: false
-    branch: ^(master|stable/rocky|stable/queens).*$
-    files:
-      - '^nova/conf/libvirt.py'
-      - '^nova/tests/unit/virt/libvirt/volume/test_nvme.py'
-      - '^nova/virt/libvirt/driver.py'
-      - '^nova/virt/libvirt/volume/nvme.py'
-      - '^cinder/privsep/nvmcli.py'
-      - '^cinder/tests/unit/targets/test_nvmeof_driver.py'
-      - '^cinder/tests/unit/targets/test_nvmet_driver.py'
-      - '^cinder/volume/targets/nvmeof.py'
-      - '^cinder/volume/targets/nvmet.py'
-      - '^os_brick/tests/initiator/connectors/test_nvme.py'
-      - '^os_brick/initiator/connectors/nvme.py'
-
+      - '^vif_plug_ovs/linux_net.py'
 
 projects:
   - name: openstack/neutron
@@ -395,40 +417,55 @@ projects:
       - Neutron-ML2-MLNX
       - Neutron-ML2-Sriov
       - Neutron-MACVTAP-ML2-Sriov
-      - OVS_HW_offload_Neutron
   - name: openstack/networking-mlnx
     check-networking-mlnx:
       - Neutron-Networking-MLNX-ML2
+      - Neutron-ML2-MLNX
   - name: openstack/nova
-    #check-mlnx-multinode:
-    #  - Nova-ML2-Sriov-Multinode
+    check-mlnx-multinode:
+      - Nova-ML2-Sriov-Multinode
     check-nova:
       - Nova-ML2-Sriov
       - Nova-MACVTAP-ML2-Sriov
-      - NVMe
   - name: openstack/os-vif
     check-os-vif:
       - OVS_HW_offload
 
-  - name: openstack/cinder
-    check-cinder:
-      - NVMe
-      - Cinder-ISER-ISCSI
-      - Cinder-ISER-LIO
-  - name: openstack/os-brick
-    check-cinder:
-      - NVMe
-      - Cinder-ISER-ISCSI
-      - Cinder-ISER-LIO
+# Currently commented since all tempest code is merged
+#  - name: openstack/tempest
+#    check-sriov-tempest:
+#      - Nova-ML2-Sriov-Multinode
 
-  - name: openstack/tempest
-    check-sriov-tempest:
-      - Tempest-Sriov
+#  - name: openstack/tempest
+#    check-sriov-tempest:
+#      - Tempest-Sriov
 
 #  - name: openstack/ironic
 #    check-ironic-ib:
 #        - Ironic-IB
 
-  - name: openstack-dev/ci-sandbox
-    check-sandbox:
-        - NOOP
+#  - name: openstack-dev/ci-sandbox
+#    check-sandbox:
+#        - NOOP
+
+# Commented til Mellanox CI is stable
+<<<<<<< Updated upstream
+#  - name: openstack/cinder
+#    check-cinder:
+#      - Cinder-ISER-ISCSI
+#      - Cinder-ISER-LIO
+=======
+  - name: openstack/cinder
+    check-cinder:
+      - Cinder-ISER-ISCSI
+      - Cinder-ISER-LIO
+>>>>>>> Stashed changes
+
+#  - name: openstack/os-brick
+#    check-cinder:
+#      - Cinder-ISER-ISCSI
+#      - Cinder-ISER-LIO
+
+
+
+

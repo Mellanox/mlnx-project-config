@@ -1,6 +1,7 @@
 - project:
     name: NVMe
-    node: NVME
+    node: 'NVME'
+    #node: 'NVME || SPDK'
     jobs:
       - 'NVMe'
 
@@ -9,6 +10,12 @@
     node: '{node}'
     concurrent: true
     parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
+
+
     builders:
       - inject:
           properties-content: |
@@ -19,19 +26,21 @@
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
       - clone-devstack
+      - apply-workarounds-pre-stack-{name}-master
       - apply-workarounds-pre-stack
-      - apply-workarounds-pre-stack-{name}
       - clean-environment-{name}
       - configure-devstack-{name}
       - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack
       - apply-workarounds-post-stack-{name}
       - run-tests-attach-volume
-      - run-tests-{name}-Tempest
+      - run-tests-{name}-tempest
+      - collect-logs-{name}
       - produce-readme-file
     properties:
       - build-discarder:
@@ -61,42 +70,76 @@
         - shell: |
             #!/bin/bash -x
             phase="apply-workarounds-pre-stack-NVMe"
-            echo "STARTED: ############## $phase  ###################"
-            cd $WORKSPACE
-
-            for mod in nvmet nvme nvme_rdma; do
-                sudo modprobe -r $mod
-            done
-
-            [ ! -d nvmetcli ] && git clone git://git.infradead.org/users/hch/nvmetcli.git
-            pushd nvmetcli
-            git pull
-            sudo python ./setup.py install
-            popd
-
-            [ ! -d nvme-cli ] && git clone https://github.com/linux-nvme/nvme-cli.git
-            pushd nvme-cli
-            git pull
-            make && sudo make install
-            popd
-
-            [ ! -d configshell-fb ] && git clone https://github.com/agrover/configshell-fb
-            pushd configshell-fb
-            git pull
-            sudo python ./setup.py install
-            popd
-
-            for module in nvme nvmet nvmet-rdma nvme-rdma
-            do
-                sudo modprobe $module
-                let status=status+$?
-            done
+            status=0
+            for module in nvme-rdma nvmet-rdma nvmet nvme nvme-fabrics; do sudo modprobe $module; sleep 1; done
             nc=$(lsmod |awk '{print $1}'|egrep "nvme$|nvmet|nvmet_rdma|nvme_rdma"|wc -l)
             if [ $nc -lt 4 ];then
                 lsmod |grep nvme
                 echo "Check if nvme|nvmet|nvmet_rdma|nvme_rdma are up"
                 let status=status+$?
             fi
+
+- builder:
+    name: apply-workarounds-pre-stack-NVMe-master
+    builders:
+        - shell: |
+            #!/bin/bash -ex
+            phase="apply-workarounds-pre-stack-NVMe-master"
+            #mlnx-nvme.x86_64 nvme-cli.x86_64 nvmetcli.noarch nvmetcli.noarch
+            sudo cat /etc/nvme/hostnqn
+            #nvme gen-hostnqn
+
+            sudo yum install -y libuuid-devel asciidoc xmlto
+            sudo pip-2.7 install configshell-fb
+
+            [ ! -d nvmetcli ] && git clone git://git.infradead.org/users/hch/nvmetcli.git
+            pushd nvmetcli
+            git checkout master
+            git fetch origin
+            git reset --hard origin/master
+            git pull
+            git checkout 75550fdaea6533e50cd152e8d133a3ef15fa2b71
+            git show
+            sudo python ./setup.py install
+            popd
+
+            exit 0
+
+
+            cd $WORKSPACE
+
+            for module in nvme-rdma nvmet-rdma nvmet nvme nvme-fabrics; do sudo modprobe -r $module; sleep 1; done
+
+            [ ! -d nvme-cli ] && git clone https://github.com/linux-nvme/nvme-cli.git
+            pushd nvme-cli
+            git checkout master
+            git fetch origin
+            git reset --hard origin/master
+            git pull
+            git show
+            git checkout ed6653d601f1d51e4582470603273c12e20a87e9
+            make && sudo make install
+            popd
+
+            [ ! -d configshell-fb ] && git clone https://github.com/agrover/configshell-fb
+            pushd configshell-fb
+            git checkout master
+            git fetch origin
+            git reset --hard origin/master
+            git pull
+            git show
+            sudo python ./setup.py install
+            popd
+
+            for module in nvme-rdma nvmet-rdma nvmet nvme nvme-fabrics; do sudo modprobe $module; sleep 1; done
+
+            nc=$(lsmod |awk '{print $1}'|egrep "nvme$|nvmet|nvmet_rdma|nvme_rdma"|wc -l)
+            if [ $nc -lt 4 ];then
+                lsmod |grep nvme
+                echo "Check if nvme|nvmet|nvmet_rdma|nvme_rdma are up"
+                let status=status+$?
+            fi
+
             exit $status
 
 - builder:
@@ -104,19 +147,285 @@
     builders:
         - shell: |
             #!/bin/bash -x
-            #echo "apply-workarounds-post-stack-NVMe"
-            #if [ -z $ZUUL_CHANGE ]; then
-            #    echo "Skipping NVMe updates"
-            #    exit 0
-            #fi
             exit 0
 
-
 - builder:
-    name: run-tests-NVMe-Tempest
+    name: run-tests-SPDK-tempest
     builders:
       - shell: |
-                #!/bin/bash +ex
+                #!/bin/bash +x
+                echo "============ Starting tempest all tests ====================="
+                cd /opt/stack/tempest
+                #time tox -e all volume
+
+                tests=(tempest.api.compute.admin.test_live_migration.LiveAutoBlockMigrationV225Test.test_iscsi_volume
+                tempest.api.compute.admin.test_live_migration.LiveAutoBlockMigrationV225Test.test_volume_backed_live_migration
+                tempest.api.compute.admin.test_live_migration.LiveMigrationTest.test_iscsi_volume
+                tempest.api.compute.admin.test_live_migration.LiveMigrationTest.test_volume_backed_live_migration
+                tempest.api.compute.admin.test_volume_swap.TestMultiAttachVolumeSwap.test_volume_swap_with_multiattach
+                tempest.api.compute.admin.test_volumes_negative.VolumesAdminNegativeTest.test_update_attached_volume_with_nonexistent_volume_in_uri
+                tempest.api.compute.servers.test_server_rescue_negative.ServerRescueNegativeTestJSON.test_rescued_vm_attach_volume
+                tempest.api.compute.servers.test_servers_negative.ServersNegativeTestJSON.test_create_server_invalid_bdm_in_2nd_dict
+                tempest.api.compute.volumes.test_attach_volume.AttachVolumeMultiAttachTest.test_boot_from_multiattach_volume
+                tempest.api.compute.volumes.test_attach_volume.AttachVolumeMultiAttachTest.test_list_get_volume_attachments_multiattach
+                tempest.api.compute.volumes.test_attach_volume.AttachVolumeMultiAttachTest.test_resize_server_with_multiattached_volume
+                tempest.api.compute.volumes.test_attach_volume.AttachVolumeMultiAttachTest.test_snapshot_volume_backed_multiattach
+                tempest.api.compute.volumes.test_attach_volume.AttachVolumeShelveTestJSON.test_detach_volume_shelved_or_offload_server
+                tempest.api.compute.volumes.test_volume_snapshots.VolumesSnapshotsTestJSON.test_volume_snapshot_create_get_list_delete
+                tempest.api.compute.volumes.test_volumes_get.VolumesGetTestJSON.test_volume_create_get_delete
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list_param_limit
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list_param_offset_and_limit
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list_with_detail_param_limit
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list_with_detail_param_offset_and_limit
+                tempest.api.compute.volumes.test_volumes_list.VolumesTestJSON.test_volume_list_with_details
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_invalid_size
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_size_zero
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_create_volume_without_passing_size
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_delete_invalid_volume_id
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_delete_volume_without_passing_volume_id
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_get_volume_without_passing_volume_id
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_volume_delete_nonexistent_volume_id
+                tempest.api.compute.volumes.test_volumes_negative.VolumesNegativeTest.test_volume_get_nonexistent_volume_id
+                tempest.api.volume.admin.test_backends_capabilities.BackendsCapabilitiesAdminTestsJSON.test_get_capabilities_backend
+                tempest.api.volume.admin.test_group_snapshots.GroupSnapshotsTest.test_create_group_from_group_snapshot
+                tempest.api.volume.admin.test_group_snapshots.GroupSnapshotsTest.test_delete_group_snapshots_following_updated_volumes
+                tempest.api.volume.admin.test_group_snapshots.GroupSnapshotsTest.test_group_snapshot_create_show_list_delete
+                tempest.api.volume.admin.test_group_snapshots.GroupSnapshotsV319Test.test_reset_group_snapshot_status
+                tempest.api.volume.admin.test_group_type_specs.GroupTypeSpecsTest.test_group_type_specs_create_show_update_list_delete
+                tempest.api.volume.admin.test_group_types.GroupTypesTest.test_group_type_create_list_update_show
+                tempest.api.volume.admin.test_groups.GroupsTest.test_group_create_show_list_delete
+                tempest.api.volume.admin.test_groups.GroupsTest.test_group_update
+                tempest.api.volume.admin.test_groups.GroupsV314Test.test_create_group_from_group
+                tempest.api.volume.admin.test_groups.GroupsV320Test.test_reset_group_status
+                tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest.test_backend_name_distinction
+                tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest.test_backend_name_distinction_with_prefix
+                tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest.test_backend_name_reporting
+                tempest.api.volume.admin.test_multi_backend.VolumeMultiBackendTest.test_backend_name_reporting_with_prefix
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_associate_disassociate_qos
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_create_delete_qos_with_back_end_consumer
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_create_delete_qos_with_both_consumer
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_create_delete_qos_with_front_end_consumer
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_get_qos
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_list_qos
+                tempest.api.volume.admin.test_qos.QosSpecsTestJSON.test_set_unset_qos_key
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_reset_snapshot_status
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_snapshot_force_delete_when_snapshot_is_creating
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_snapshot_force_delete_when_snapshot_is_deleting
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_snapshot_force_delete_when_snapshot_is_error
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_snapshot_force_delete_when_snapshot_is_error_deleting
+                tempest.api.volume.admin.test_snapshots_actions.SnapshotsActionsTest.test_update_snapshot_status
+                tempest.api.volume.admin.test_user_messages.UserMessagesTest.test_delete_message
+                tempest.api.volume.admin.test_user_messages.UserMessagesTest.test_list_show_messages
+                tempest.api.volume.admin.test_volume_hosts.VolumeHostsAdminTestsJSON.test_list_hosts
+                tempest.api.volume.admin.test_volume_hosts.VolumeHostsAdminTestsJSON.test_show_host
+                tempest.api.volume.admin.test_volume_pools.VolumePoolsAdminTestsJSON.test_get_pools_with_details
+                tempest.api.volume.admin.test_volume_pools.VolumePoolsAdminTestsJSON.test_get_pools_without_details
+                tempest.api.volume.admin.test_volume_quota_classes.VolumeQuotaClassesTest.test_show_default_quota
+                tempest.api.volume.admin.test_volume_quota_classes.VolumeQuotaClassesTest.test_update_default_quota
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_delete_quota
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_list_default_quotas
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_list_quotas
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_quota_usage
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_quota_usage_after_volume_transfer
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_show_quota_usage
+                tempest.api.volume.admin.test_volume_quotas.VolumeQuotasAdminTestJSON.test_update_all_quota_resources_for_tenant
+                tempest.api.volume.admin.test_volume_quotas_negative.VolumeQuotasNegativeTestJSON.test_quota_volume_gigabytes
+                tempest.api.volume.admin.test_volume_quotas_negative.VolumeQuotasNegativeTestJSON.test_quota_volumes
+                tempest.api.volume.admin.test_volume_quotas_negative.VolumeQuotasNegativeTestJSON.test_volume_extend_gigabytes_quota_deviation
+                tempest.api.volume.admin.test_volume_retype.VolumeRetypeWithMigrationTest.test_available_volume_retype_with_migration
+                tempest.api.volume.admin.test_volume_retype.VolumeRetypeWithMigrationTest.test_volume_from_snapshot_retype_with_migration
+                tempest.api.volume.admin.test_volume_retype.VolumeRetypeWithoutMigrationTest.test_available_volume_retype
+                tempest.api.volume.admin.test_volume_services.VolumesServicesTestJSON.test_get_service_by_host_name
+                tempest.api.volume.admin.test_volume_services.VolumesServicesTestJSON.test_get_service_by_service_and_host_name
+                tempest.api.volume.admin.test_volume_services.VolumesServicesTestJSON.test_get_service_by_service_binary_name
+                tempest.api.volume.admin.test_volume_services.VolumesServicesTestJSON.test_get_service_by_volume_host_name
+                tempest.api.volume.admin.test_volume_services.VolumesServicesTestJSON.test_list_services
+                tempest.api.volume.admin.test_volume_services_negative.VolumeServicesNegativeTest.test_disable_log_reason_with_no_reason
+                tempest.api.volume.admin.test_volume_services_negative.VolumeServicesNegativeTest.test_disable_service_with_invalid_binary
+                tempest.api.volume.admin.test_volume_services_negative.VolumeServicesNegativeTest.test_enable_service_with_invalid_host
+                tempest.api.volume.admin.test_volume_services_negative.VolumeServicesNegativeTest.test_freeze_host_with_invalid_host
+                tempest.api.volume.admin.test_volume_services_negative.VolumeServicesNegativeTest.test_thaw_host_with_invalid_host
+                tempest.api.volume.admin.test_volume_snapshot_quotas_negative.VolumeSnapshotQuotasNegativeTestJSON.test_quota_volume_gigabytes_snapshots
+                tempest.api.volume.admin.test_volume_snapshot_quotas_negative.VolumeSnapshotQuotasNegativeTestJSON.test_quota_volume_snapshots
+                tempest.api.volume.admin.test_volume_types.VolumeTypesTest.test_volume_type_create_get_delete
+                tempest.api.volume.admin.test_volume_types.VolumeTypesTest.test_volume_type_encryption_create_get_update_delete
+                tempest.api.volume.admin.test_volume_types.VolumeTypesTest.test_volume_type_list
+                tempest.api.volume.admin.test_volume_types.VolumeTypesTest.test_volume_type_update
+                tempest.api.volume.admin.test_volume_types_extra_specs.VolumeTypesExtraSpecsTest.test_volume_type_extra_spec_create_get_delete
+                tempest.api.volume.admin.test_volume_types_extra_specs.VolumeTypesExtraSpecsTest.test_volume_type_extra_specs_list
+                tempest.api.volume.admin.test_volume_types_extra_specs.VolumeTypesExtraSpecsTest.test_volume_type_extra_specs_update
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_create_invalid_body
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_create_none_body
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_create_nonexistent_type_id
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_delete_nonexistent_volume_type_id
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_get_nonexistent_extra_spec_name
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_get_nonexistent_volume_type_id
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_list_nonexistent_volume_type_id
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_update_multiple_extra_spec
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_update_no_body
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_update_none_extra_spec_id
+                tempest.api.volume.admin.test_volume_types_extra_specs_negative.ExtraSpecsNegativeTest.test_update_nonexistent_extra_spec_id
+                tempest.api.volume.admin.test_volume_types_negative.VolumeTypesNegativeTest.test_create_with_empty_name
+                tempest.api.volume.admin.test_volume_types_negative.VolumeTypesNegativeTest.test_delete_nonexistent_type_id
+                tempest.api.volume.admin.test_volume_types_negative.VolumeTypesNegativeTest.test_get_nonexistent_type_id
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_force_detach_volume
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_volume_force_delete_when_volume_is_attaching
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_volume_force_delete_when_volume_is_creating
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_volume_force_delete_when_volume_is_error
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_volume_force_delete_when_volume_is_maintenance
+                tempest.api.volume.admin.test_volumes_actions.VolumesActionsTest.test_volume_reset_status
+                tempest.api.volume.admin.test_volumes_backup.VolumesBackupsAdminTest.test_volume_backup_export_import
+                tempest.api.volume.admin.test_volumes_backup.VolumesBackupsAdminTest.test_volume_backup_reset_status
+                tempest.api.volume.admin.test_volumes_list.VolumesListAdminTestJSON.test_volume_list_param_tenant
+                tempest.api.volume.test_availability_zone.AvailabilityZoneTestJSON.test_get_availability_zone_list
+                tempest.api.volume.test_extensions.ExtensionsTestJSON.test_list_extensions
+                tempest.api.volume.test_image_metadata.VolumesImageMetadata.test_update_show_delete_image_metadata
+                tempest.api.volume.test_snapshot_metadata.SnapshotMetadataTestJSON.test_crud_snapshot_metadata
+                tempest.api.volume.test_snapshot_metadata.SnapshotMetadataTestJSON.test_update_show_snapshot_metadata_item
+                tempest.api.volume.test_versions.VersionsTest.test_list_versions
+                tempest.api.volume.test_volume_absolute_limits.AbsoluteLimitsTests.test_get_volume_absolute_limits
+                tempest.api.volume.test_volume_delete_cascade.VolumesDeleteCascade.test_volume_delete_cascade
+                tempest.api.volume.test_volume_delete_cascade.VolumesDeleteCascade.test_volume_from_snapshot_cascade_delete
+                tempest.api.volume.test_volume_metadata.VolumesMetadataTest.test_crud_volume_metadata
+                tempest.api.volume.test_volume_metadata.VolumesMetadataTest.test_update_show_volume_metadata_item
+                tempest.api.volume.test_volume_transfers.VolumesTransfersTest.test_create_get_list_accept_volume_transfer
+                tempest.api.volume.test_volume_transfers.VolumesTransfersTest.test_create_list_delete_volume_transfer
+                tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_attach_detach_volume_to_instance
+                tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_get_volume_attachment
+                tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_reserve_unreserve_volume
+                tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_volume_bootable
+                tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_volume_readonly_update
+                tempest.api.volume.test_volumes_backup.VolumesBackupsTest.test_backup_create_attached_volume
+                tempest.api.volume.test_volumes_backup.VolumesBackupsTest.test_bootable_volume_backup_and_restore
+                tempest.api.volume.test_volumes_backup.VolumesBackupsTest.test_volume_backup_create_get_detailed_list_restore_delete
+                tempest.api.volume.test_volumes_backup.VolumesBackupsV39Test.test_update_backup
+                tempest.api.volume.test_volumes_clone.VolumesCloneTest.test_create_from_bootable_volume
+                tempest.api.volume.test_volumes_clone.VolumesCloneTest.test_create_from_volume
+                tempest.api.volume.test_volumes_clone_negative.VolumesCloneNegativeTest.test_create_from_volume_decreasing_size
+                tempest.api.volume.test_volumes_extend.VolumesExtendTest.test_volume_extend
+                tempest.api.volume.test_volumes_extend.VolumesExtendTest.test_volume_extend_when_volume_has_snapshot
+                tempest.api.volume.test_volumes_get.VolumesGetTest.test_volume_create_get_update_delete
+                tempest.api.volume.test_volumes_get.VolumesGetTest.test_volume_create_get_update_delete_as_clone
+                tempest.api.volume.test_volumes_get.VolumesGetTest.test_volume_create_get_update_delete_from_image
+                tempest.api.volume.test_volumes_get.VolumesSummaryTest.test_show_volume_summary
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_by_name
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_details_by_name
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_details_pagination
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_details_with_multiple_params
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_pagination
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_param_display_name_and_status
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_with_detail_param_display_name_and_status
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_with_detail_param_marker
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_with_detail_param_metadata
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_with_details
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volume_list_with_param_metadata
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_by_availability_zone
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_by_bootable
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_by_status
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_details_by_availability_zone
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_details_by_bootable
+                tempest.api.volume.test_volumes_list.VolumesListTestJSON.test_volumes_list_details_by_status
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_attach_volumes_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_from_deactivated_image
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_from_image_with_decreasing_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_invalid_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_nonexistent_snapshot_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_nonexistent_source_volid
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_nonexistent_volume_type
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_size_negative
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_with_size_zero
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_create_volume_without_passing_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_delete_invalid_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_delete_volume_without_passing_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_detach_volumes_with_invalid_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_get_invalid_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_get_volume_without_passing_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_list_volumes_detail_with_invalid_status
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_list_volumes_detail_with_nonexistent_name
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_list_volumes_with_invalid_status
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_list_volumes_with_nonexistent_name
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_reserve_volume_with_negative_volume_status
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_reserve_volume_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_unreserve_volume_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_update_volume_with_empty_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_update_volume_with_invalid_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_update_volume_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_delete_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_extend_with_None_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_extend_with_non_number_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_extend_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_extend_with_size_smaller_than_original_size
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_extend_without_passing_volume_id
+                tempest.api.volume.test_volumes_negative.VolumesNegativeTest.test_volume_get_nonexistent_volume_id
+                tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_snapshot_backup
+                tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_volume_from_snapshot
+                tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_snapshot_create_get_list_update_delete
+                tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_volume_from_snapshot_no_size
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_limit
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_limit_equals_infinite
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_limit_equals_zero
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_marker
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_offset
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_created_at_asc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_created_at_desc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_id_asc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_id_desc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_name_asc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshot_list_param_sort_name_desc
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshots_list_details_with_params
+                tempest.api.volume.test_volumes_snapshots_list.VolumesSnapshotListTestJSON.test_snapshots_list_with_params
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_create_snapshot_with_nonexistent_volume_id
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_create_snapshot_without_passing_volume_id
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_list_snapshot_invalid_param_limit
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_list_snapshots_invalid_param_marker
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_list_snapshots_invalid_param_sort
+                tempest.api.volume.test_volumes_snapshots_negative.VolumesSnapshotNegativeTestJSON.test_volume_from_snapshot_decreasing_size
+                tempest.scenario.test_stamp_pattern.TestStampPattern.test_stamp_pattern
+                tempest.scenario.test_volume_backup_restore.TestVolumeBackupRestore.test_volume_backup_restore
+                #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern.test_boot_server_from_encrypted_volume_luks
+                #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern.test_create_server_from_volume_snapshot
+                #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern.test_image_defined_boot_from_volume
+                #tempest.scenario.test_volume_migrate_attached.TestVolumeMigrateRetypeAttached.test_volume_migrate_attached
+                #tempest.api.compute.servers.test_delete_server.DeleteServersTestJSON.test_delete_server_while_in_attached_volume
+                #tempest.api.compute.servers.test_device_tagging.TaggedAttachmentsTest.test_tagged_attachment
+                #tempest.api.compute.servers.test_server_actions.ServerActionsTestJSON.test_rebuild_server_with_volume_attached
+                #tempest.api.compute.servers.test_server_actions.ServerActionsTestJSON.test_resize_server_revert_with_volume_attached
+                #tempest.api.compute.servers.test_server_actions.ServerActionsTestJSON.test_resize_volume_backed_server_confirm
+                #tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes.test_encrypted_cinder_volumes_cryptsetup
+                #tempest.scenario.test_minimum_basic.TestMinimumBasicScenario.test_minimum_basic_scenario
+                #tempest.scenario.test_shelve_instance.TestShelveInstance.test_shelve_volume_backed_instance
+                #tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_snapshot_create_delete_with_volume_in_use
+                #tempest.api.volume.test_volumes_snapshots.VolumesSnapshotTestJSON.test_snapshot_create_offline_delete_online
+                #tempest.api.compute.servers.test_server_rescue_negative.ServerRescueNegativeTestJSON.test_rescued_vm_detach_volume
+                #tempest.api.compute.admin.test_volumes_negative.VolumesAdminNegativeTest.test_update_attached_volume_with_nonexistent_volume_in_body
+                #tempest.api.compute.servers.test_servers_negative.ServersNegativeTestJSON.test_create_server_from_non_bootable_volume
+                #tempest.api.compute.volumes.test_attach_volume.AttachVolumeShelveTestJSON.test_attach_volume_shelved_or_offload_server
+                #tempest.api.compute.volumes.test_attach_volume.AttachVolumeTestJSON.test_attach_detach_volume
+                #tempest.api.compute.volumes.test_attach_volume.AttachVolumeTestJSON.test_list_get_volume_attachments
+                #tempest.api.compute.volumes.test_attach_volume_negative.AttachVolumeNegativeTest.test_attach_attached_volume_to_different_server
+                #tempest.api.compute.volumes.test_attach_volume_negative.AttachVolumeNegativeTest.test_attach_attached_volume_to_same_server
+                #tempest.api.compute.volumes.test_attach_volume_negative.AttachVolumeNegativeTest.test_delete_attached_volume
+                #tempest.api.volume.test_volumes_actions.VolumesActionsTest.test_volume_upload
+                )
+                status=0
+                for test in ${tests[@]}; do
+                    sudo rmmod nvme_rdma
+                    sudo modprobe nvme_rdma
+                    stestr run $test
+                    if [ "$?" -ne "0" ];then
+                	    echo "!!!!!! $test failed"
+                	    status=1
+                    fi
+                done
+                exit $status
+
+- builder:
+    name: run-tests-NVMe-tempest
+    builders:
+      - shell: |
+                #!/bin/bash +x
                 echo "============ Starting tempest tests ====================="
                 tests=(
                        tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
@@ -143,21 +452,23 @@
                 fi
 
 - builder:
-    name: run-tests-attach-volume
+    name: run-tests-attach-volume-old
     builders:
         - shell: |
                 #!/bin/bash -ex
                 phase="RUN-TESTS-attach"
                 pushd $WORKSPACE/devstack
+
+                TIMEOUT=120
                 status=0
                 . openrc admin admin
                 volume_name=volume_nvme
-                #openstack volume create --size 1 $volume_name
-                cinder create 1 --name $volume_name
+                openstack volume create --size 1 $volume_name
+                #cinder create 1 --name $volume_name
                 image=$(openstack image list|grep "cir"|awk '{print $4}')
                 nova hypervisor-list
                 sleep 20
-                openstack server create --flavor m1.tiny --image $image vm1
+                openstack server create --flavor m1.tiny --image $image --network private vm1
                 nova show vm1
                 sleep 240
                 nova show vm1
@@ -167,10 +478,12 @@
                 nova=$(openstack server list | awk '{print $2}' | grep '-')
                 cinder_vol=$(openstack volume list| awk '{print $2}' | grep '-')
                 nova volume-attach $nova $cinder_vol
-                sleep 30
+                sleep 60
+
                 vstat=$(openstack volume list|grep $volume_name |awk '{print $6}')
                 openstack server list
                 openstack volume list
+
                 if [ "$vstat" != "in-use" ]; then
                    openstack server list
                    openstack volume list
@@ -179,7 +492,7 @@
                 fi
                 echo "Detaching nova volume"
                 nova volume-detach $nova $cinder_vol
-                sleep 30
+                sleep 60
                 vstat=$(openstack volume list|grep $volume_name |awk '{print $6}')
                 if [ "$vstat" != "available" ]; then
                    openstack volume list
@@ -212,7 +525,6 @@
             phase="configure-devstack-NVMe"
             echo "STARTED: ############## $phase  ###################"
 
-            echo "Using pci=$pci pf=$pf HCA=$HCA"
             if [[ -n $ZUUL_PROJECT ]]; then
               project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
               refspec=$(echo ${ZUUL_CHANGES##*^} | rev|cut -d':' -f1|rev)
@@ -238,7 +550,7 @@
             RABBIT_PASSWORD=password
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
-            HOST_IP=$(hostname -I | awk '{print $1}')
+            HOST_IP=$(hostname -I | sed  's/ /\n/g' | grep 10)
             FORCE=yes
             RECLONE=yes
             LOG_COLOR=False
@@ -252,12 +564,8 @@
             VOLUME_NAME_PREFIX="volume-"
             VOLUME_BACKING_FILE_SIZE=10250M
 
-            #enable_service = q-svc q-agt q-dhcp q-l3 q-meta neutron tempest
-            #disable_service = horizon n-net dstat
-
             disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw etcd3 horizon dstat
             enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-xvnc n-novnc
-
 
             ## Neutron options
             Q_USE_SECGROUP=True
@@ -269,8 +577,8 @@
             Q_ML2_TENANT_NETWORK_TYPE=vxlan
             Q_L3_ENABLED=True
 
-            PUBLIC_NETWORK_NAME=external
-            PUBLIC_PHYSICAL_NETWORK=public
+            #PUBLIC_NETWORK_NAME=external
+            #PUBLIC_PHYSICAL_NETWORK=public
             PHYSICAL_NETWORK=default
 
             # Required for l3-agent to connect to external-network-bridge
@@ -319,3 +627,352 @@
             tempest_roles = Admin
             EOF
             echo "FINISHED: ############## $phase  ###################"
+- project:
+    name: SPDK
+    node: SPDK
+    jobs:
+      - 'SPDK'
+
+- job-template:
+    name: 'SPDK'
+    node: '{node}'
+    concurrent: true
+    parameters:
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            HCA=MT277
+            PATH=$PATH:/usr/sbin
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=$EXT_SERVER
+            PATH=$PATH:/usr/sbin
+            SPDK_PATH=/jenkins/workspace/spdk/
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      - apply-workarounds-pre-stack
+      - apply-workarounds-pre-stack-NVMe
+      #- apply-workarounds-pre-stack-{name}
+      #- clean-environment-{name}
+      - rebuild_spdk_vol
+      - configure-devstack-NVMe
+      - run-stacksh # Running Devstack
+      - apply-workarounds-post-stack
+      - apply-workarounds-post-stack-{name}
+      #- rebuild_spdk_vol
+      #- run-tests-attach-volume
+      #- rebuild_spdk_vol
+      - run-tests-{name}-tempest
+      - collect-logs-{name}
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 10
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 10
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
+      - upload-console-log #This line must be the last one
+
+
+- builder:
+    name: configure-devstack-SPDK
+    builders:
+        - shell: |
+            #!/bin/bash -ex
+            phase="configure-devstack-SPDK"
+            echo "STARTED: ############## $phase  ###################"
+
+            if [[ -n $ZUUL_PROJECT ]]; then
+              project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
+              refspec=$(echo ${ZUUL_CHANGES##*^} | rev|cut -d':' -f1|rev)
+              project=${project//-/_}
+              export ${project^^}_BRANCH=$refspec
+            fi
+            i=1
+            export ip1=1.1.1.1
+            export ip2=2.2.2.2
+
+            for pci in $(lspci |grep $HCA | grep -v Virtual | awk '{print $1}');do
+                for p in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}');do
+                    sudo ifconfig $p $i.$i.$i.$i/24 up
+                    let i=i+1
+                done
+            done
+
+            cat > $WORKSPACE/devstack/local.conf <<EOF
+            [[local|localrc]]
+            DOWNLOAD_DEFAULT_IMAGES=True
+            ADMIN_PASSWORD=password
+            MYSQL_PASSWORD=password
+            RABBIT_PASSWORD=password
+            SERVICE_PASSWORD=password
+            SERVICE_TOKEN=servicetoken
+            HOST_IP=$(hostname -I | awk '{print $1}')
+            FORCE=yes
+            RECLONE=yes
+            LOG_COLOR=False
+            #PIP_UPGRADE=True
+            LOGDIR=${LOGDIR:-/opt/stack/logs}
+            LOGFILE=$LOGDIR/stack.sh.log
+            LIBS_FROM_GIT=os-brick
+
+            # Cinder
+            VOLUME_GROUP_NAME="stack-volumes"
+            VOLUME_NAME_PREFIX="volume-"
+            VOLUME_BACKING_FILE_SIZE=10250M
+
+            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw etcd3 horizon dstat
+            enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-xvnc n-novnc
+
+            ## Neutron options
+            Q_USE_SECGROUP=True
+
+            # Neutron ML2 with OpenVSwitch
+            NEUTRON_CREATE_INITIAL_NETWORKS=True
+            Q_PLUGIN=ml2
+            Q_AGENT=openvswitch
+            Q_ML2_TENANT_NETWORK_TYPE=vxlan
+            Q_L3_ENABLED=True
+
+            PUBLIC_NETWORK_NAME=external
+            PUBLIC_PHYSICAL_NETWORK=public
+            PHYSICAL_NETWORK=default
+
+            # Required for l3-agent to connect to external-network-bridge
+            PUBLIC_BRIDGE=br-ex
+            OVS_BRIDGE_MAPPINGS=public:br-ex
+
+            [[post-config|/etc/cinder/cinder.conf]]
+            [DEFAULT]
+            enabled_backends = spdk-1
+            default_volume_type = None
+
+            [[test-config|\$TEMPEST_CONFIG]]
+            [volume]
+            backend_names = spdk-1
+            [volume-feature-enabled]
+            multi_backend = False
+
+            [auth]
+            tempest_roles = Admin
+            EOF
+            echo "FINISHED: ############## $phase  ###################"
+            exit 1
+
+- builder:
+    name: rebuild_spdk_vol
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            echo "Show SPDK devices"
+
+            # Working with NVMe Malloc0
+            #for d in $(sudo $SPDK_PATH/scripts/rpc.py get_bdevs|egrep name|grep -v product_name|grep -v Malloc0|awk '{print $NF}'|cut -d',' -f1);do
+            #    sudo $SPDK_PATH/scripts/rpc.py delete_bdev $d
+            #done
+            # Working with Malloc0
+            #sudo $SPDK_PATH/scripts/rpc.py delete_bdev Malloc0
+            #sudo $SPDK_PATH/scripts/rpc.py construct_malloc_bdev -b Malloc0 2048 4096
+            #sudo $SPDK_PATH/scripts/rpc.py construct_lvol_store Malloc0 lvs
+
+
+            # Working with NVMe Drive at 06:00.0
+            SPDK_PATH=/jenkins/workspace/spdk
+            vol=Nvme0
+
+            sudo $SPDK_PATH/scripts/rpc.py delete_nvme_controller $vol
+            sudo $SPDK_PATH/scripts/rpc.py -v construct_nvme_bdev -b $vol -t PCIe -a 06:00.0
+            sudo $SPDK_PATH/scripts/rpc.py get_nvme_controllers
+
+
+            sudo $SPDK_PATH/scripts/rpc.py destroy_lvol_store -l lvs
+            sudo $SPDK_PATH/scripts/rpc.py construct_lvol_store ${vol}n1 lvs
+
+            #sudo systemctl restart devstack@c-*
+
+            echo "Show SPDK devices"
+            sudo $SPDK_PATH/scripts/rpc.py get_bdevs
+
+- builder:
+    name: apply-workarounds-post-stack-SPDK
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            echo "apply-workarounds-post-stack-SPDK"
+            cd /opt/stack/cinder
+
+            crudini --set /etc/cinder/cinder.conf DEFAULT target_helper spdk-nvmeof
+            crudini --del /etc/cinder/cinder.conf DEFAULT default_volume_type
+            crudini --set /etc/cinder/cinder.conf DEFAULT enabled_backends spdk-1,spdk-2
+
+            crudini --set /opt/stack/tempest/etc/tempest.conf volume backend_names spdk-1,spdk-2
+            crudini --set /opt/stack/tempest/etc/tempest.conf volume-feature-enabled multi_backend False
+
+            cat >> /etc/cinder/cinder.conf <<EOF
+
+            [spdk-1]
+            spdk_rpc_ip = localhost
+            spdk_rpc_port = 8000
+            spdk_rpc_username = user
+            spdk_rpc_password = password
+            target_ip_address = 1.1.1.1
+            target_port = 4260
+            target_protocol = nvmet_rdma
+            target_helper = spdk-nvmeof
+            target_prefix = nqn.2014-08.org.spdk
+            volume_driver = cinder.volume.drivers.spdk.SPDKDriver
+            volume_backend_name = SPDK
+
+            [spdk-2]
+            spdk_rpc_ip = localhost
+            spdk_rpc_port = 8000
+            spdk_rpc_username = user
+            spdk_rpc_password = password
+            target_ip_address = 2.2.2.2
+            target_port = 4260
+            target_protocol = nvmet_rdma
+            target_helper = spdk-nvmeof
+            target_prefix = nqn.2014-08.org.spdk
+            volume_driver = cinder.volume.drivers.spdk.SPDKDriver
+            volume_backend_name = SPDK
+            EOF
+
+            exit 0
+
+
+- builder:
+    name: collect-logs-SPDK
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            if [ -f /jenkins/workspace/spdk/scripts/rpc.py ]; then
+                sudo /jenkins/workspace/spdk/scripts/rpc.py get_bdevs > $LOGDIR/spdk_devices.log
+                sudo /jenkins/workspace/spdk/scripts/rpc.py get_lvol_stores > $LOGDIR/get_lvol_stores.log
+            fi
+
+
+- builder:
+    name: collect-logs-NVMe
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            exit 0
+
+- builder:
+    name: run-tests-attach-volume
+    builders:
+        - shell: |
+                #!/bin/bash -ex
+                phase="RUN-TESTS-attach"
+                pushd $WORKSPACE/devstack
+                status=0
+                . openrc admin
+                volume_name=volume_nvme
+                openstack volume create --size 1 $volume_name
+
+                TIMEOUT=500
+
+                start=$(date +%s)
+                let stop=$(date +%s)+$TIMEOUT
+                vol_status=$(openstack volume show $volume_name | grep ' status'| awk '{print $4}')
+                echo "Waiting for volume $volume_name to be available. Currrently is $vol_status time is $start"
+                while [ "$vol_status" != "available" ]; do
+                        echo "Current time is $(date)"
+                        vol_status=$(openstack volume show $volume_name | grep ' status'| awk '{print $4}')
+                        if [ "$vol_status" == "error" ]; then
+                            echo "$volume_name is in ERROR state"
+                            openstack volume show $volume_name
+                            exit 1
+                        fi
+                        if [ $stop -lt $(date +%s) ]; then
+                                echo "Volume $volume_name is still not active time is $stop"
+                                $(date +%s)
+                                exit 1
+                        fi
+                        openstack volume show $volume_name
+                        echo "Waiting for volume $volume_name to be available. Currrently is $vol_status"
+                done
+
+                image=$(openstack image list|grep "cir"|awk '{print $4}')
+                openstack server create --flavor m1.tiny --image $image --network private vm1
+
+                start=$(date +%s)
+                let stop=$(date +%s)+$TIMEOUT
+                vm_status=$(openstack server show vm1 | grep status| awk '{print $4}')
+                while [ "$vm_status" != "ACTIVE" ]; do
+                        vm_status=$(openstack server show vm1 | grep status|  awk '{print $4}')
+                        if [ "$vm_status" == "ERROR" ]; then
+                            echo "VM is in ERROR state"
+                            openstack server show vm1
+                            exit 1
+                        fi
+                        if [ $stop -lt $(date +%s) ]; then
+                                echo "VM is still not active"
+                                exit 1
+                        fi
+                        echo "Waiting for vm1 to be ACTIVE. Currrently is $vm_status"
+                done
+
+                echo "Attaching nova volume"
+                nova=$(openstack server list | awk '{print $2}' | grep '-')
+                cinder_vol=$(openstack volume list| awk '{print $2}' | grep '-')
+                nova volume-attach $nova $cinder_vol
+
+                start=$(date +%s)
+                let stop=$(date +%s)+$TIMEOUT
+                vol_status=$(openstack volume show $volume_name | grep ' status ' | awk '{print $4}')
+                while [ "$vol_status" != "in-use" ]; do
+                    vol_status=$(openstack volume show $volume_name | grep ' status ' | awk '{print $4}')
+                    if [ "$vol_status" == 'error' ]; then
+                            echo "Volume is in error state"
+                            openstack volume show $volume_name
+                            exit 1
+                    fi
+                    if [ $stop -lt $(date +%s) ]; then
+                            echo "Volume is still not in-use"
+                            exit 1
+                    fi
+                    openstack volume show $volume_name
+                done
+
+                echo "Detaching nova volume"
+                nova volume-detach $nova $cinder_vol
+
+                start=$(date +%s)
+                let stop=$(date +%s)+$TIMEOUT
+                vol_status=$(openstack volume show $volume_name | grep ' status ' | awk '{print $4}')
+                while [ "$vol_status" != "available" ]; do
+                    vol_status=$(openstack volume show $volume_name | grep ' status ' | awk '{print $4}')
+                    if [ "$vol_status" == 'error' ]; then
+                            echo "Volume is in error state"
+                            openstack volume show $volume_name
+                            exit 1
+                    fi
+                    if [ $stop -lt $(date +%s) ]; then
+                            echo "Volume is still not avaliable"
+                            exit 1
+                    fi
+                    openstack volume show $volume_name
+                done
+
+                openstack volume delete $cinder_vol
+                sleep 60
+                c=$(openstack volume list|grep $volume_name 2>&1|tee)
+                if [ "$c" != "" ]; then
+                    echo "ERROR Cinder not deleted"
+                    cinder list
+                    status=1
+                fi
+
+                openstack server delete $nova
+                echo "FINISHED: ############## $phase status=$status ###################"
+                exit $status

@@ -1,0 +1,444 @@
+# This job is based on
+# https://wikinox.mellanox.com/pages/viewpage.action?pageId=163512650
+- project:
+    name: 'OVS_DPDK_REPRESENTORS'
+    node: DPDK
+    jobs:
+      - 'OVS_DPDK_REPRESENTORS'
+
+- job-template:
+    name: 'OVS_DPDK_REPRESENTORS'
+    node: '{node}'
+    concurrent: false
+    disabled: false
+    parameters:
+      - string:
+          name: DPDK_VERSION
+          default: '18.11'
+          description: "DPDK version"
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: false
+          description: "Unstack devstack when job is finished"
+
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=13.74.249.42
+            HCA=MT277|MT278
+            PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      - clone-devstack
+      #- configure-devstack-local-conf
+      - configure-devstack-local-conf-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack-{name}
+      - run-sanity-check
+      #- run-tests-network-dpdk
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - upload-console-log-mn #This line must be the last one
+
+
+- builder:
+    name: apply-workarounds-post-stack-OVS_DPDK_REPRESENTORS
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="apply-workarounds-post-stack-OVS_DPDK_REPRESENTORS"
+          echo "STARTED: ############## $phase  ###################"
+          export HCA=${HCA:-MT27800}
+
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}')
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          export numa=$(sudo cat /sys/class/net/$pf/device/numa_node )
+          sudo cat /proc/cmdline
+          sudo lscpu
+          sudo numactl --hardware
+          cat /sys/class/net/$pf/device/local_cpulist
+          echo "pci=$pci, pf=$pf numa=$numa"
+
+          sudo ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-init=true
+          sudo ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-extra="-w 0000:$pci --proc-type primary"
+          sudo ovs-vsctl --no-wait add-port br-ovs-dpdk dpdk_uplink -- set Interface dpdk_uplink type=dpdk options:dpdk-devargs=0000:${pci}
+
+          sudo ovs-vsctl get Open_vSwitch . other_config
+
+- builder:
+    name: run-sanity-test-OVS_DPDK_REPRESENTORS
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          . $WORKSPACE/devstack/openrc admin admin
+          openstack flavor create --ram 1024 --vcpus 1 --property hw:cpu_mode='host-model' --property hw:mem_page_size='large' --public --id 100 --disk 1 dpdk.1g
+          openstack flavor create --ram 1024 --vcpus 1 --property hw:cpu_mode='host-model' --property hw:mem_page_size='large' --public --id 200 --disk 1 dpdk.2g
+          image=$(openstack image list|grep active|awk '{print $4}')
+          openstack port create --network private --vnic-type=direct --no-security-group --disable-port-security --binding-profile '{"capabilities": ["switchdev"]}' direct1
+          openstack server create --image $image --flavor dpdk.1g --nic port-id=direct1 VM1
+          echo "Use root:cloudx to login"
+
+- builder:
+    name: configure-devstack-local-conf-OVS_DPDK_REPRESENTORS
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="CONFIGURE-DEVSTACK-DPDK"
+          echo "STARTED: ############## $phase  ###################"
+
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          export numa=$(sudo cat /sys/class/net/$pf/device/numa_node )
+          echo "pci=$pci, pf=$pf numa=$numa"
+
+          cat >> $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          DOWNLOAD_DEFAULT_IMAGES=False
+          IMAGE_URLS="http://13.74.249.42/images/rhel_7.5_inbox_driver.qcow2,"
+          MULTI_HOST=1
+          ADMIN_PASSWORD=password
+          MYSQL_PASSWORD=password
+          RABBIT_PASSWORD=password
+          SERVICE_PASSWORD=password
+          SERVICE_TOKEN=servicetoken
+          VOLUME_BACKING_FILE_SIZE=1000M
+          LOGDIR=\${LOGDIR:-/opt/stack/logs}
+          LOGFILE=\$LOGDIR/stack.sh.log
+          PIP_UPGRADE=False
+          FORCE=yes
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+          GIT_BASE=https://review.opendev.org
+          RECLONE=yes
+          HOST_IP=$(hostname -I | awk '{print $1}')
+
+          HOST_NAME=$(hostname)
+
+          LIBS_FROM_GIT=tooz,os-vif
+
+          enable_plugin networking-ovs-dpdk ${GIT_BASE}/x/networking-ovs-dpdk $ZUUL_BRANCH
+          OVS_DPDK_MODE=controller_ovs_dpdk
+
+          enable_service n-cpu
+          enable_service neutron
+          enable_service q-svc
+          enable_service q-agt
+          enable_service q-dhcp
+          enable_service q-l3
+          enable_service q-meta
+          enable_service tempest
+          disable_service n-net
+          disable_service etcd
+          disable_service c-vol
+
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          ENABLE_TENANT_VLANS=True
+          ENABLE_TENANT_TUNNELS=False
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan,flat
+          TENANT_VLAN_RANGE=2:100
+          PHYSICAL_NETWORK=default
+
+          OVS_LOG_DIR=/opt/stack/logs
+          OVS_DATAPATH_TYPE=netdev
+          OVS_BRIDGE_MAPPINGS=default:br-ovs-dpdk
+          OVS_INTERFACE_DRIVER=mlnx
+          OVS_NUM_HUGEPAGES=2048
+          OVS_DPDK_MEM_SEGMENTS=2000
+          OVS_HUGEPAGE_MOUNT_PAGESIZE=2M
+          OVS_PMD_CORE_MASK=6
+          OVS_SOCKET_MEM=2048,0
+          RTE_TARGET=x86_64-native-linuxapp-gcc
+          OVS_GIT_TAG=v2.11.0
+          OVS_DPDK_GIT_TAG=v${DPDK_VERSION}
+
+          LIBS_FROM_GIT=tooz
+
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [sriov_nic]
+          physical_device_mappings = default:${pf}
+
+
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          firewall_driver=nova.virt.firewall.NoopFirewallDriver
+          scheduler_default_filters=RamFilter,ComputeFilter,AvailabilityZoneFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,PciPassthroughFilter,NUMATopologyFilter
+          vcpu_pin_set=12-17
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+
+          [pci]
+          passthrough_whitelist = {"'"devname"'": "'"${pf}"'", "'"physical_network"'": "'"default"'"}
+
+          [filter_scheduler]
+          enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+          available_filters = nova.scheduler.filters.all_filters
+
+          [libvirt]
+          cpu_mode=host-model
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+# This job is based on
+# https://wikinox.mellanox.com/display/SW/OVS+over+DPDK
+- project:
+    name: 'OVS_DPDK'
+    node: DPDK
+    jobs:
+      - 'OVS_DPDK'
+
+- job-template:
+    name: 'OVS_DPDK'
+    node: '{node}'
+    concurrent: false
+    disabled: false
+    parameters:
+      - string:
+          name: DPDK_VERSION
+          default: '18.11'
+          description: "DPDK version"
+      - string:
+          name: OVS_VERSION
+          default: '2.11.0'
+          description: "OVS version"
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: false
+          description: "Unstack devstack when job is finished"
+
+
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            EXT_SERVER=13.74.249.42
+            LOGSERVER=cloudx@$EXT_SERVER
+            IMAGE_SERVER=13.74.249.42
+            HCA=MT277|MT278
+            PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
+            PORT_TYPE=normal
+            FLAVOR=dpdk_1g
+      - check-environment
+      - mlnx-project-config
+      - clean-environment
+      #- eswitch-configure
+      - clone-devstack
+      #- configure-devstack-local-conf
+      - configure-devstack-local-conf-{name}
+      - run-stacksh
+      - apply-workarounds-post-stack-{name}
+      - run-sanity-check
+      #- run-tests-network-basic-advanced
+      - run-tests-network-dpdk
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 200
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 200
+    publishers:
+      - upload-console-log-mn #This line must be the last one
+
+
+- builder:
+    name: apply-workarounds-post-stack-OVS_DPDK
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="apply-workarounds-post-stack-dpdk-ovs"
+          echo "STARTED: ############## $phase  ###################"
+          export HCA=${HCA:-MT27800}
+
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}')
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          export numa=$(sudo cat /sys/class/net/$pf/device/numa_node)
+          sudo cat /proc/cmdline
+          sudo lscpu
+          sudo numactl --hardware
+          cat /sys/class/net/$pf/device/local_cpulist
+          echo "pci=$pci, pf=$pf numa=$numa"
+
+          sudo ovs-vsctl --timeout 10 set Open_vSwitch . other_config:dpdk-init=true
+          sudo devlink dev eswitch show pci/0000:$pci
+
+          sudo ovs-vsctl --timeout 10 add-port br-ovs-dpdk dpdk0  -- set Interface dpdk0 type=dpdk  options:dpdk-devargs=0000:${pci}
+
+          sudo ovs-vsctl --timeout 10 set Open_vSwitch . other_config:dpdk-extra="-w ${pci}"
+          sudo ovs-vsctl get Open_vSwitch . other_config
+
+          . $WORKSPACE/devstack/openrc admin admin
+          openstack flavor create --property hw:mem_page_size='large' --public --id ${FLAVOR} --disk 1 ${FLAVOR}
+          openstack flavor create --property hw:mem_page_size='large' --public --id ${FLAVOR}_1 --disk 1 ${FLAVOR}_1
+          for i in $(ls /sys/class/net); do
+              sudo ifconfig $i up
+          done
+          sudo systemctl restart iptables
+          sudo systemctl restart devstack@q-*
+
+
+- builder:
+    name: run-sanity-check
+    #name: run-sanity-test-OVS_DPDK
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          PORT_TYPE=${PORT_TYPE:-direct}
+          FLAVOR=${FLAVOR:-'m1.small'}
+
+          . $WORKSPACE/devstack/openrc admin admin
+          image=$(openstack image list|grep active|awk '{print $4}')
+          openstack port create --network private --vnic-type=$PORT_TYPE port_$PORT_TYPE
+          openstack server create --image $image --flavor ${FLAVOR} --nic port-id=port_$PORT_TYPE VM1
+
+          ip=$(openstack floating ip create public|grep floating_ip_address| awk '{print $4}')
+          openstack floating ip set --port port_$PORT_TYPE $ip
+          rc=1
+          i=0
+          while [ $rc != 0 ]; do
+              ping -c1 $ip
+              rc=$?
+              let i=i+1
+              if [ $i -gt 500 ]; then
+                  echo "Still no ping"
+                  exit 1
+              fi
+          done
+          openstack floating ip delete $ip
+          openstack port delete port_$PORT_TYPE
+          openstack server delete VM1
+          exit $rc
+
+
+- builder:
+    name: configure-devstack-local-conf-OVS_DPDK
+    builders:
+      - shell: |
+          #!/bin/bash -x
+          phase="CONFIGURE-DEVSTACK-DPDK"
+          echo "STARTED: ############## $phase  ###################"
+
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          export numa=$(sudo cat /sys/class/net/$pf/device/numa_node )
+          echo "pci=$pci, pf=$pf numa=$numa"
+
+          cat >> $WORKSPACE/devstack/local.conf <<EOF
+          [[local|localrc]]
+          HOST_IP_IFACE=$(host $(hostname) | cut -d' ' -f4)
+          HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+          HOST_NAME=$(hostname)
+          RECLONE=yes
+          MYSQL_PASSWORD=password
+          DATABASE_PASSWORD=password
+          RABBIT_PASSWORD=password
+          ADMIN_PASSWORD=password
+          SERVICE_PASSWORD=password
+          HORIZON_PASSWORD=password
+          SERVICE_TOKEN=tokentoken
+          SUBNETPOOL_PREFIX_V4=172.0.0.0/16
+
+          enable_plugin networking-ovs-dpdk ${GIT_BASE}/x/networking-ovs-dpdk $ZUUL_BRANCH
+          enable_plugin neutron ${GIT_BASE}/openstack/neutron $ZUUL_BRANCH
+
+          disable_service n-net
+          enable_service tempest
+          disable_service horizon
+          disable_service c-api
+          disable_service c-sch
+          disable_service c-vol
+          enable_service n-cpu
+          enable_service neutron
+          enable_service q-svc
+          enable_service q-agt
+          enable_service q-dhcp
+          enable_service q-l3
+          enable_service q-meta
+
+          DEST=/opt/stack
+          LOGDIR=$DEST/logs/
+          LOGFILE=${LOGDIR}/stack.sh.log
+
+          Q_ML2_TENANT_NETWORK_TYPE=vlan
+          ENABLE_TENANT_VLANS=True
+          ENABLE_TENANT_TUNNELS=False
+          ML2_VLAN_RANGES=default:2:100
+
+          OVS_NUM_HUGEPAGES=3072
+          OVS_DATAPATH_TYPE=netdev
+          OVS_LOG_DIR=/opt/stack/logs
+          OVS_BRIDGE_MAPPINGS=default:br-ovs-dpdk,public:br-ex
+          OVS_PHYSICAL_BRIDGE=br-ovs-dpdk
+          OVS_SOCKET_MEM=2048,0
+          OVS_DPDK_MODE=controller_ovs_dpdk
+          OVS_INTERFACE_DRIVER=mlnx
+          OVS_GIT_TAG=v${OVS_VERSION}
+          OVS_DPDK_GIT_TAG=v${DPDK_VERSION}
+
+          RTE_TARGET=x86_64-native-linuxapp-gcc
+
+          [[post-config|$NOVA_CONF]]
+          [DEFAULT]
+          firewall_driver=nova.virt.firewall.NoopFirewallDriver
+          scheduler_default_filters=RamFilter,ComputeFilter,AvailabilityZoneFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,PciPassthroughFilter,NUMATopologyFilter
+
+          [[post-config|/etc/neutron/plugins/ml2/ml2_conf.ini]]
+          [securitygroup]
+          firewall_driver =
+
+          [libvirt]
+          cpu_mode=host-model
+
+          [[test-config|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=$PORT_TYPE
+          [compute]
+          flavor_ref=${FLAVOR}
+          flavor_ref_alt=${FLAVOR}_1
+          build_timeout = 300
+          [validation]
+          ssh_timeout = 300
+          ping_timeout = 300
+          EOF
+
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: run-tests-network-dpdk
+    builders:
+        - shell: |
+            #!/bin/bash
+            phase="run-tests-network-dpdk"
+            echo "STARTED: ############## $phase  ###################"
+            tests=(
+                tempest.scenario.test_network_advanced_server_ops
+                tempest.scenario.test_network_basic_ops
+            )
+            pushd /opt/stack/tempest
+
+            stestr init
+            stestr list ${tests[@]}
+
+            virtualenv virt --no-site-packages
+            . virt/bin/activate
+            test_pass=0
+            virt/bin/pip install -U -r requirements.txt
+            stestr run ${tests[@]}
+            test_pass=$?
+            deactivate
+
+            if [[ $test_pass -ne 0 ]]; then
+                echo "FINISHED with ERROR: ############## $phase  ###################"
+                exit 1
+            fi
+            popd
+            echo "FINISHED: ############## $phase  ###################"
+

@@ -38,16 +38,14 @@ known_issues = { 'loop_device': { 'file': 'stack.sh.log',
 
                }
 
-report = { "mail": "lennyb@mellanox.com,moshele@mellanox.com" }
+report = { "mail": "lennyb@mellanox.com" }
 
 def send_email(rm):
     fp = tempfile.NamedTemporaryFile(delete=True)
     fp.write('RM %s is back again\n' % rm)
 
-    #http://13.69.151.247/05/357105/5/check-nova/Nova-ML2-Sriov/46b5418/env/environment.txt.gz
     fp.write('More details in http://%s/%s\n' % (os.environ.get('EXT_SERVER','') ,os.environ.get('LOG_PATH','')))
     fp.write("\n%s\n\n" % known_issues[rm]['msg'])
-    #fp.write("\n\n\n %s\n" % os.environ)
     fp.write("cloudx-16-01:/home/CI/scripts/rerun_jobs.py -p %s -j %s\n" % (os.environ.get('JOB_NAME',""), os.environ.get('BUILD_NUMBER',"")))
     fp.seek(0)
     msg = MIMEText(fp.read())

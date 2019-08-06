@@ -8,7 +8,7 @@
 - project:
     name: Neutron-ML2-Sriov
     github-org: openstack-dev
-    node: ETH_CX34
+    node: ETH_CX34 || Centos7.6
     jobs:
       - 'Neutron-ML2-Sriov'
 
@@ -20,9 +20,23 @@
         - 'Neutron-Networking-MLNX-ML2'
 
 - project:
+    name: Networking-MLNX-EPY27
+    github-org: openstack-dev
+    node: daily
+    jobs:
+        - 'Networking-MLNX-EPY27'
+
+- project:
+    name: Networking-MLNX-PEP8
+    github-org: openstack-dev
+    node: daily
+    jobs:
+        - 'Networking-MLNX-PEP8'
+
+- project:
     name: Nova-ML2-Sriov
     github-org: openstack-dev
-    node: ETH_CX34
+    node: ETH_CX34 || Centos7.6
     jobs:
         - 'Nova-ML2-Sriov'
 
@@ -30,16 +44,14 @@
 - project:
     name: Nova-MACVTAP-ML2-Sriov
     github-org: openstack-dev
-    #node: MACVTAP
-    node: ETH_CX34
+    node: ETH_CX34 || Centos7.6
     jobs:
         - 'Nova-MACVTAP-ML2-Sriov'
 
 - project:
     name: Neutron-MACVTAP-ML2-Sriov
     github-org: openstack-dev
-    #node: MACVTAP
-    node: ETH_CX34
+    node: ETH_CX34 || Centos7.6
     jobs:
         - 'Neutron-MACVTAP-ML2-Sriov'
 
@@ -53,7 +65,7 @@
 - project:
     name: Tempest-Sriov
     github-org: openstack-dev
-    node: ETH_CX34
+    node: ETH_CX34 || Centos7.6
     jobs:
         - 'Tempest-Sriov'
 

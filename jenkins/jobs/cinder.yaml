@@ -92,7 +92,7 @@
             SERVICE_PASSWORD=password
             SERVICE_TOKEN=servicetoken
             FORCE=yes
-            HOST_IP=$(host $(hostname) | cut -d' ' -f4)
+            HOST_IP=$(hostname -I | awk '{print $1}')
 
             RECLONE=yes
             LOG_COLOR=False
@@ -119,8 +119,8 @@
             Q_ML2_TENANT_NETWORK_TYPE=vxlan
             Q_L3_ENABLED=True
 
-            PUBLIC_NETWORK_NAME=external
-            PUBLIC_PHYSICAL_NETWORK=public
+            #PUBLIC_NETWORK_NAME=external
+            #PUBLIC_PHYSICAL_NETWORK=public
             PHYSICAL_NETWORK=default
 
             # Required for l3-agent to connect to external-network-bridge
@@ -155,6 +155,11 @@
             backend_names = lvmdriver-1,backend1
             [volume-feature-enabled]
             multi_backend = True
+            [compute]
+            build_timeout = 300
+            #[[post-config|/etc/neutron/l3_agent.ini]]
+            #[DEFAULT]
+            #external_network_bridge = br-ex
             EOF
             echo "FINISHED: ############## $phase  ###################"
 
@@ -162,7 +167,7 @@
     name: Cinder-ISER-ISCSI
     github-org: openstack-dev
     node: CINDER
-    concurrent: True
+    concurrent: true
     jobs:
         - 'Cinder-ISER-ISCSI'
 
@@ -170,7 +175,7 @@
     name: Cinder-ISER-LIO
     github-org: openstack-dev
     node: CINDER
-    concurrent: True
+    concurrent: true
     jobs:
         - 'Cinder-ISER-LIO'
 
@@ -200,7 +205,7 @@
 - job-template:
     name: 'Cinder-ISER-ISCSI'
     node: '{node}'
-    concurrent: True
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -211,6 +216,7 @@
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             CINDER_PROTOCOL=tgtadm
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -222,7 +228,7 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
       - apply-workarounds-post-stack-{name}
-      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack
       - run-tests-attach-volume
       - run-tests-cinder
       - produce-readme-file
@@ -246,7 +252,7 @@
 - job-template:
     name: 'SimX-Run-ISER-LIO'
     node: '{node}'
-    concurrent: false
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -263,7 +269,7 @@
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
       - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack
       #- run-tests-cinder
       - run-tests-cinder-lio-simx
       - produce-readme-file
@@ -287,7 +293,7 @@
 - job-template:
     name: 'SimX-Run-ISER-ISCSI'
     node: '{node}'
-    concurrent: false
+    concurrent: true
     builders:
       - inject:
           properties-content: |
@@ -304,7 +310,7 @@
       - apply-workarounds-pre-stack
       - configure-devstack-cinder
       - run-stacksh # Running Devstack
-      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack
       - run-tests-cinder
       #- run-tests-cinder-iscsi-simx
       - produce-readme-file
@@ -374,6 +380,7 @@
             IMAGE_SERVER=13.74.249.42
             PATH=$PATH:/usr/sbin
             CINDER_PROTOCOL=lioadm
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -383,7 +390,7 @@
       - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
-      - apply-workarounds-post-stack
+      #- apply-workarounds-post-stack
       - run-tests-attach-volume
       - run-tests-cinder
       - produce-readme-file
@@ -412,7 +419,7 @@
 #    name: SimX-Cinder-ISER-LIO
 #    project-type: multijob
 #    node: cloudx-17
-#    concurrent: false
+#    concurrent: true
 #    triggers:
 #      - timed: '@daily'
 #    builders:
@@ -447,7 +454,7 @@
 #    name: SimX-Cinder-ISER-ISCSI
 #    project-type: multijob
 #    node: cloudx-17
-#    concurrent: false
+#    concurrent: true
 #    triggers:
 #      - timed: '@daily'
 #    builders:

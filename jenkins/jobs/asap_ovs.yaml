@@ -5,13 +5,10 @@
             #!/bin/bash -ex
             phase="APPLY-WORKAROUNDS-PRE-VLAN"
             echo "STARTED: ############## $phase  ###################"
-            echo "Configure ASAP VLAN"
-            pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
-            pf=$(ls -l /sys/class/net/ | grep $pci|awk '{print $9}' | head -n1)
-            echo "Using pci=$pci pf=$pf"
 
             sudo ovs-dpctl del-dp ovs-system 2>&1|tee
             sudo modprobe -r openvswitch 2>&1|tee > /dev/null
+            sudo yum install mariadb-server -y
 
 
 - builder:
@@ -23,41 +20,60 @@
 
 
 - builder:
-    name: asap-configure
+    name: eswitch-configure
     builders:
         - shell: |
-            #!/bin/bash -ex
+            #!/bin/bash -x
 
-            # VLAN
-            pci=$(lspci |grep Mell|grep $HCA |head -n1|awk '{print $1}'| sed s/\.0\$//g)
+            status=0
+            pci=$(lspci |grep Mell|egrep $HCA |head -n1|awk '{print $1}')
             pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
             echo "pci=$pci pf=$pf HCA=$HCA"
+
             NUM_VFS=4
-
-            sudo sh -c "echo 0 > /sys/class/net/${pf}/device/sriov_numvfs"
-            sudo sh -c "echo $NUM_VFS > /sys/class/net/${pf}/device/sriov_numvfs"
-
-            echo "Unbind devices"
-            i=1
-            while [ ! $i -gt $NUM_VFS ]; do
-                echo "unbinding 0000:${pci}.$i"
-                sudo sh -c "echo  0000:${pci}.$i > /sys/bus/pci/drivers/mlx5_core/unbind 2>&1|tee > /dev/null"
-                let i=i+1
+            sudo sh -c "echo 0 > /sys/class/net/$pf/device/sriov_numvfs"
+            sudo sh -c "echo 4 > /sys/class/net/$pf/device/sriov_numvfs"
+            for vf in $(lspci |grep Mell|grep Virtual| awk '{print $1}'); do
+                 sudo sh -c "echo 0000:$vf > /sys/bus/pci/drivers/mlx5_core/unbind"
             done
 
-            echo "Configure ASAP"
-            sudo devlink dev eswitch set pci/0000:${pci}.0 mode switchdev
-            sudo ethtool -K $pf hw-tc-offload on
+            sudo devlink dev eswitch set pci/0000:$pci mode switchdev
+            sudo devlink dev eswitch show pci/0000:$pci
 
-            i=1
-            while [ ! $i -gt $NUM_VFS ]; do
-                echo "binding 0000:${pci}.$i"
-                sudo sh -c "echo  0000:${pci}.$i > /sys/bus/pci/drivers/mlx5_core/bind 2>&1|tee > /dev/null"
-                let i=i+1
+            for vf in $(lspci |grep Mell|grep Virtual| awk '{print $1}'); do
+                 sudo sh -c "echo 0000:$vf > /sys/bus/pci/drivers/mlx5_core/bind"
             done
 
-            lspci|grep Mell
-            ls -l /sys/class/net/
+            for i in $(ip link |grep -v UP |awk '{print $2}' | egrep ':$'|cut -d':' -f1|sort -r)
+            do
+               sudo ip link set $i up
+               sleep 5
+               sudo ip link set $i up
+            done
+
+            exit 0
+
+            for pci in $(lspci |grep Mell|grep Virtual|grep -v ConnectX-3  | awk '{print $1}'); do
+                sudo sh -c "echo  0000:${pci} > /sys/bus/pci/drivers/mlx5_core/unbind 2>&1|tee > /dev/null"
+                sleep 1
+            done
+
+            for pci in $(lspci |grep Mell|grep -v Virtual|grep -v ConnectX-3  | awk '{print $1}'); do
+                sudo sh -c "echo  0000:${pci} > /sys/bus/pci/drivers/mlx5_core/unbind 2>&1|tee > /dev/null"
+                sudo sh -c "echo  0000:${pci} > /sys/bus/pci/drivers/mlx5_core/bind 2>&1|tee > /dev/null"
+
+                sudo devlink dev eswitch set pci/0000:${pci} mode switchdev
+                sudo ethtool -K $pf hw-tc-offload on
+
+                sudo devlink dev eswitch show pci/0000:${pci}
+                sleep 3
+            done
+            for i in $(ip link |grep -v UP |awk '{print $2}' | egrep ':$'|cut -d':' -f1|sort -r)
+            do
+               sudo ip link set $i up
+               sleep 5
+               sudo ip link set $i up
+            done
 
 
 - builder:
@@ -70,16 +86,68 @@
             echo "Stop iptables and network manager services"
             sudo systemctl stop iptables.service
 
-
 - builder:
-    name: configure-devstack-OVS_HW_offload
+    name: configure-devstack-local-conf-offload
     builders:
       - shell: |
           #!/bin/bash -ex
           phase="CONFIGURE-DEVSTACK"
           echo "STARTED: ############## $phase  ###################"
 
-          export pci=$(lspci |grep Mell|grep $HCA|head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}'|  sed s/\.0\$//g)
+          export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
+          echo "pci=$pci, pf=$pf"
+
+          cat >> $WORKSPACE/devstack/local.conf <<EOF
+          # configure-devstack-local-conf-offload
+          IMAGE_URLS="http://$IMAGE_SERVER/images/cirros-mellanox_eth.img,"
+          # Neutron
+          Q_ML2_PLUGIN_MECHANISM_DRIVERS=openvswitch
+          enable_plugin os-vif ${GIT_BASE}/openstack/os-vif $ZUUL_BRANCH
+
+          [[post-config|\$NOVA_CONF]]
+          [DEFAULT]
+          scheduler_available_filters=nova.scheduler.filters.all_filters
+          [pci]
+          passthrough_whitelist ={"'"address"'":"'"*:'"$pci"'.*"'","'"physical_network"'":"'"default"'"}
+          [filter_scheduler]
+          enabled_filters = RetryFilter,AvailabilityZoneFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+          #enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+
+          EOF
+          echo "FINISHED: ############## $phase  ###################"
+
+- builder:
+    name: configure-devstack-local-conf-tempest-offload
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+
+          cat >> $WORKSPACE/devstack/local.conf <<EOF
+          # configure-devstack-local-conf-tempest-offload
+          [[test-config|\$TEMPEST_CONFIG]]
+          [network]
+          port_vnic_type=direct
+          port_profile = capabilities:[switchdev]
+          [network-feature-enabled]
+          api_extensions=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group,network
+          [compute-feature-enabled]
+          suspend=false
+          resize=false
+          [auth]
+          tempest_roles = Admin
+          EOF
+
+
+- builder:
+    name: configure-devstack-OVS_HW_offload_old
+    builders:
+      - shell: |
+          #!/bin/bash -ex
+          phase="CONFIGURE-DEVSTACK"
+          echo "STARTED: ############## $phase  ###################"
+
+          export pci=$(lspci |grep Mell|egrep "$HCA" |head -n1|awk '{print $1}'|  sed s/\.0\$//g)
           export pf=$(ls -l /sys/class/net/| grep $pci|awk '{print $9}'| head -n1)
           echo "pci=$pci, pf=$pf"
 
@@ -94,12 +162,13 @@
           LIBS_FROM_GIT=python-neutronclient
           SERVICE_TOKEN=servicetoken
           IDENTITY_API_VERSION=3
-          HOST_IP=$(hostname -i)
+          HOST_IP=$(hostname -I | awk '{print $1}')
           SUBNETPOOL_PREFIX_V4=172.0.0.0/16
           FORCE=yes
 
           LIBS_FROM_GIT=os-vif,neutron-lib
-          OVS_BRANCH=v2.9.0
+          OVS_BRANCH=v2.11.0
+          Q_BUILD_OVS_FROM_GIT=True
 
           PUBLIC_INTERFACE=$pf
           # Logging
@@ -118,22 +187,24 @@
           Q_USE_DEBUG_COMMAND=False
           Q_USE_SECGROUP=True
           ENABLE_TENANT_VLANS=True
-          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan
+          Q_ML2_PLUGIN_TYPE_DRIVERS=vlan,flat
           ENABLE_TENANT_TUNNELS=False
           Q_ML2_TENANT_NETWORK_TYPE=vlan
           PHYSICAL_NETWORK=default
-          PHYSICAL_INTERFACE=$pf
+          PUBLIC_INTERFACE=$pf
+          #PHYSICAL_INTERFACE=$pf
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          OVS_PHYSICAL_BRIDGE=br-$pf
+          #OVS_PHYSICAL_BRIDGE=br-$pf
           ALLOW_NEUTRON_DB_MIGRATIONS=true
-          Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          #Q_USE_PROVIDERNET_FOR_PUBLIC=False
+          OVS_BRIDGE_MAPPINGS=default:br-${PUBLIC_INTERFACE},public:br-ex
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3 dstat
           enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-novnc n-xvnc n-cpu placement-api tempest
 
-          enable_plugin neutron https://github.com/openstack/neutron $ZUUL_BRANCH
-          enable_plugin os-vif https://github.com/openstack/os-vif $ZUUL_BRANCH
+          enable_plugin neutron ${GIT_BASE}openstack/neutron $ZUUL_BRANCH
+          enable_plugin os-vif ${GIT_BASE}/openstack/os-vif $ZUUL_BRANCH
 
           [[post-config|\$NOVA_CONF]]
           [DEFAULT]
@@ -141,7 +212,8 @@
           [pci]
           passthrough_whitelist ={"'"address"'":"'"*:'"$pci"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
-          enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,DiskFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+          enabled_filters = RetryFilter,AvailabilityZoneFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
+          #enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
@@ -153,18 +225,21 @@
           resize=false
           [auth]
           tempest_roles = Admin
+          #[[post-config|/etc/neutron/l3_agent.ini]]
+          #[DEFAULT]
+          #external_network_bridge = br-ex
           EOF
           echo "FINISHED: ############## $phase  ###################"
 
 - project:
     name: VLAN-ASAP-Configure
-    node: OVS_HW_offload
+    node: OFFLOAD
     jobs:
       - 'VLAN-ASAP-Configure'
 
 - project:
     name: ASAP-Update-kernel
-    node: OVS_HW_offload
+    node: OFFLOAD
     jobs:
       - 'ASAP-Update-kernel'
 
@@ -178,10 +253,10 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT277
+            HCA=MT277|MT278
             PATH=$PATH:/usr/sbin
             RELEASE=latest
-       - asap-configure
+       - eswitch-configure
     properties:
       - build-discarder:
           days-to-keep: 60
@@ -191,7 +266,7 @@
 
 - project:
     name: 'OVS_HW_offload'
-    node: OVS_HW_offload
+    node: OFFLOAD
     jobs:
       - 'OVS_HW_offload'
       - 'OVS_HW_offload_Neutron'
@@ -200,6 +275,12 @@
     name: 'OVS_HW_offload_Neutron'
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
+
     builders:
       - inject:
           properties-content: |
@@ -207,17 +288,23 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT277
+            HCA=MT277|MT278
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
+      - eswitch-configure
       - clone-devstack
       - apply-workarounds-pre-stack-asap-vlan
-      - configure-devstack-OVS_HW_offload
+      - configure-devstack-local-conf
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-offload
+      - configure-devstack-local-conf-tempest-offload
       - run-stacksh
+      - apply-workarounds-post-stack
       - apply-workarounds-post-stack-asap-vlan
-      - run-tests-network-asap
+      - run-tests-network-basic-advanced
     properties:
       - build-discarder:
           days-to-keep: 60
@@ -232,6 +319,11 @@
     name: 'OVS_HW_offload'
     node: '{node}'
     concurrent: true
+    parameters:
+      - bool:
+          name: UNSTACK_ON_JOB_FINISH
+          default: true
+          description: "Unstack devstack when job is finished"
     builders:
       - inject:
           properties-content: |
@@ -239,17 +331,23 @@
             EXT_SERVER=13.74.249.42
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=13.74.249.42
-            HCA=MT277
+            HCA=MT277|MT278
             PATH=$PATH:/usr/sbin
+            GIT_BASE=https://review.opendev.org
       - check-environment
       - mlnx-project-config
       - clean-environment
+      - eswitch-configure
       - clone-devstack
       - apply-workarounds-pre-stack-asap-vlan
-      - configure-devstack-{name}
+      - configure-devstack-local-conf
+      - configure-devstack-local-conf-neutron-common
+      - configure-devstack-local-conf-offload
+      - configure-devstack-local-conf-tempest-offload
       - run-stacksh
+      - apply-workarounds-post-stack
       - apply-workarounds-post-stack-asap-vlan
-      - run-tests-network-asap
+      - run-tests-network-basic-advanced
     properties:
       - build-discarder:
           days-to-keep: 60
@@ -268,7 +366,7 @@
        - inject:
           properties-content: |
             LOGDIR=$WORKSPACE/../ASAP-Controller/ci-artifacts/logs
-            HCA=MT277
+            HCA=MT277|MT278
             PATH=$PATH:/usr/sbin
             RELEASE_DIR=/jenkins/ASAP
             RELEASE=ASAP2_DIRECT-4.0-1
@@ -355,7 +453,7 @@
             exit 0
 
 - builder:
-    name: run-tests-network-asap
+    name: run-tests-network-basic-advanced
     builders:
         - shell: |
             #!/bin/bash
