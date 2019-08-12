@@ -1,4 +1,51 @@
 - project:
+    name: Build-Kernel-Mellanox
+    node: builder
+    jobs:
+      - 'Build-Kernel-Mellanox'
+
+- job-template:
+    name: 'Build-Kernel-Mellanox'
+    node: '{node}'
+    #triggers:
+    #  - timed: '@monthly'
+    concurrent: false
+    parameters:
+      - string:
+          name: branch
+          default: master
+      - string:
+          name: commit
+          default: None
+    builders:
+      - inject:
+          properties-content: |
+            LOGDIR=$WORKSPACE/ci-artifacts/logs
+            PATH=$PATH:/usr/sbin
+            OUTPUT=/qa/qa/cloudx/build/kernel
+      - clean-build-machine
+      - build-kernel-mlnx
+      - produce-readme-file
+    properties:
+      - build-discarder:
+          days-to-keep: 60
+          num-to-keep: 100
+          artifact-days-to-keep: 60
+          artifact-num-to-keep: 100
+    publishers:
+      - email-ext:
+          recipients: lennyb@mellanox.com
+          subject: Failed Mellanox CI {name}
+          failure: true
+          body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets check it"
+      - upload-console-log #This line must be the last one
+    wrappers:
+      - timeout:
+          timeout: 380
+          fail: true
+
+
+- project:
     name: Build-Kernel
     node: builder
     jobs:
@@ -20,7 +67,8 @@
             LOGDIR=$WORKSPACE/ci-artifacts/logs
             PATH=$PATH:/usr/sbin
             PATH=$PATH:/usr/sbin
-            OUTPUT=/net/mtrlabfs01/vol/QA/qa/qa/cloudx/upstream/kernel/
+            OUTPUT=/qa/qa/cloudx/build/kernel
+            #OUTPUT=/net/mtrlabfs01/vol/QA/qa/qa/cloudx/upstream/kernel/
       - clean-build-machine
       - build-kernel
       - produce-readme-file
@@ -49,7 +97,7 @@
         - shell: |
             #!/bin/bash -x
             mkdir -p /home_stack/kernel_build
-            sudo rm -rf /home_stack/kernel_build/rpmbuild /home_stack/rpmbuild/*
+            sudo rm -rf /home_stack/kernel_build/rpmbuild /home_stack/rpmbuild/* /root/rpmbuild
             sudo rm -rf $LOGDIR
             mkdir -p $LOGDIR
 
@@ -98,6 +146,51 @@
             cd *${version_to_build}*
             sudo scripts/kconfig/merge_config.sh -n /home_stack/config-4.18.0-32.el8.x86_64
             #sudo scripts/kconfig/merge_config.sh -n /boot/config-$(uname -r)
+            sudo chown -R $(whoami) .
+            for config in "CONFIG_DELL_SMBIOS_WMI=y" "CONFIG_DELL_SMBIOS_SMM=y" "CONFIG_DEVMEM=y"; do
+                echo $config >> .config
+            done
+            echo "Bulding kernel. Log details $NODE_NAME:/$log"
+            pwd
+            echo "make rpm-pkg -j4 -s > $log"
+            sudo make rpm-pkg -j4 -s 2>&1|tee > $log
+
+            status=$?
+            tail -n300 $log
+
+            if [ "$status" -eq 0 ]; then
+                tmp="/tmp/$$"
+                mkdir $tmp
+                for file in $(tail -n 20 $log|grep 'Wrote:' | awk '{print $2}'); do
+                    sudo mv $file $tmp
+                done
+                sudo chown stack -R $tmp
+                mkdir -p $OUTPUT
+                mv $tmp $OUTPUT/$version_to_build
+                ln -snf $OUTPUT/$version_to_build $OUTPUT/latest
+                rm -rf /home_kernel/linux-${version_to_build}*
+            fi
+            echo "See $OUTPUT"
+            ls $OUTPUT
+            exit $status
+
+- builder:
+    name: build-kernel-mlnx
+    builders:
+        - shell: |
+            #!/bin/bash -x
+            set -o pipefail
+
+
+
+            git clone http://l-gerrit.mtl.labs.mlnx:8080/upstream/linux
+            cd linux
+            git checkout $branch
+            git checkout $commit
+
+            exit 0
+
+            sudo scripts/kconfig/merge_config.sh -n /home_stack/config-4.18.0-32.el8.x86_64
             sudo chown -R $(whoami) .
             for config in "CONFIG_DELL_SMBIOS_WMI=y" "CONFIG_DELL_SMBIOS_SMM=y" "CONFIG_DEVMEM=y"; do
                 echo $config >> .config

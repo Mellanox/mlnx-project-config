@@ -11,13 +11,24 @@
     #  - timed: '@monthly'
     concurrent: false
     parameters:
+      - bool:
+          name: update_latest
+          default: true
+          description: "/net/r1/vol/QA/qa/qa/cloudx/build/ovs/latest_ovs_master"
       - string:
           name: dpdk_version
           default: latest
       - string:
           name: ovs_branch
           default: branch-2.11
-
+      - string:
+          name: ovs_repo
+          default: https://github.com/openvswitch/ovs.git
+          description: "OVS repo. ex: https://github.com/Mellanox/OVS"
+      - string:
+          name: ovs_pullrequest
+          default: None
+          description: "PullReguest number. ex: 67"
 
     builders:
       - inject:
@@ -28,9 +39,8 @@
             LOGSERVER=cloudx@$EXT_SERVER
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
-            #OUTPUT=/tmp/lny/20181009
-            OUTPUT=/net/r1/vol/QA/qa/qa/cloudx/build/ovs
-      #- clean-build-machine
+            OUTPUT=/qa/qa/cloudx/build/ovs
+      - clean-build-machine
       - build-dpdk
       - produce-readme-file
     properties:
@@ -114,8 +124,15 @@
             sudo yum install -y $(ls ~/rpmbuild/RPMS/x86_64/dpdk*)
 
             cd /home_stack/
-            git clone --single-branch --branch $ovs_branch https://github.com/openvswitch/ovs.git
+            git clone $ovs_repo ovs
             cd ovs
+            git checkout $ovs_branch
+
+            if [ $ovs_pullrequest != "None" ]; then
+                git fetch --tags --progress $ovs_repo +refs/pull/*:refs/remotes/origin/pr/*
+                git pull origin pull/${ovs_pullrequest}/head
+            fi
+
             sed -e 's/@VERSION@/0.0.1/' rhel/openvswitch-fedora.spec.in > /tmp/ovs.spec
             sudo yum-builddep -y /tmp/ovs.spec
 
@@ -138,6 +155,7 @@
             cp ~/rpmbuild/RPMS/*/* $OUTPUT/$ovs_version/${run_date}
             cp rpm/rpmbuild/RPMS/*/* $OUTPUT/$ovs_version/${run_date}
             rm -f ~/rpmbuild/RPMS/*/*
-            ln -snf $OUTPUT/${ovs_version}/${run_date} $OUTPUT/latest_ovs_${ovs_version}
+
+            $update_latest && ln -snf $OUTPUT/${ovs_version}/${run_date} $OUTPUT/latest_ovs_${ovs_version}
 
             exit $?

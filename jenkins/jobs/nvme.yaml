@@ -1,7 +1,6 @@
 - project:
     name: NVMe
     node: 'NVME'
-    #node: 'NVME || SPDK'
     jobs:
       - 'NVMe'
 
@@ -14,8 +13,6 @@
           name: UNSTACK_ON_JOB_FINISH
           default: true
           description: "Unstack devstack when job is finished"
-
-
     builders:
       - inject:
           properties-content: |
@@ -56,6 +53,7 @@
           body: "Hello, my dear friend,\nunfortunately we have some issues in CI,\nplease, take a beer and lets take a look\n\n$DEFAULT_CONTENT\nhttp://$EXT_SERVER/$LOG_PATH/\nhttp://$EXT_SERVER/$JOB_NAME_$BUILD_NUMBER"
       - upload-console-log #This line must be the last one
 
+
 - builder:
     name: clean-environment-NVMe
     builders:
@@ -64,6 +62,7 @@
             echo "Cleaning NVME"
             sudo nvmetcli clear 2>&1|tee
 
+
 - builder:
     name: apply-workarounds-pre-stack-NVMe
     builders:
@@ -71,13 +70,17 @@
             #!/bin/bash -x
             phase="apply-workarounds-pre-stack-NVMe"
             status=0
+            sudo yum install -y nvme-cli
+
             for module in nvme-rdma nvmet-rdma nvmet nvme nvme-fabrics; do sudo modprobe $module; sleep 1; done
             nc=$(lsmod |awk '{print $1}'|egrep "nvme$|nvmet|nvmet_rdma|nvme_rdma"|wc -l)
             if [ $nc -lt 4 ];then
                 lsmod |grep nvme
                 echo "Check if nvme|nvmet|nvmet_rdma|nvme_rdma are up"
-                let status=status+$?
+                let status=status+1
             fi
+            exit $status
+
 
 - builder:
     name: apply-workarounds-pre-stack-NVMe-master
@@ -85,11 +88,9 @@
         - shell: |
             #!/bin/bash -ex
             phase="apply-workarounds-pre-stack-NVMe-master"
-            #mlnx-nvme.x86_64 nvme-cli.x86_64 nvmetcli.noarch nvmetcli.noarch
-            sudo cat /etc/nvme/hostnqn
-            #nvme gen-hostnqn
+            status=0
 
-            sudo yum install -y libuuid-devel asciidoc xmlto
+            sudo yum install -y libuuid-devel asciidoc xmlto nvme-cli
             sudo pip-2.7 install configshell-fb
 
             [ ! -d nvmetcli ] && git clone git://git.infradead.org/users/hch/nvmetcli.git
@@ -103,11 +104,16 @@
             sudo python ./setup.py install
             popd
 
-            exit 0
+            if [ -f /etc/nvme/hostnqn ]; then
+                cat /etc/nvme/hostnqn
+                exit $status
+            fi
 
+            sudo mkdir /etc/nvme/
+            sudo chown stack /etc/nvme/
+            nvme gen-hostnqn > /etc/nvme/hostnqn
 
             cd $WORKSPACE
-
             for module in nvme-rdma nvmet-rdma nvmet nvme nvme-fabrics; do sudo modprobe -r $module; sleep 1; done
 
             [ ! -d nvme-cli ] && git clone https://github.com/linux-nvme/nvme-cli.git
@@ -142,12 +148,14 @@
 
             exit $status
 
+
 - builder:
     name: apply-workarounds-post-stack-NVMe
     builders:
         - shell: |
             #!/bin/bash -x
             exit 0
+
 
 - builder:
     name: run-tests-SPDK-tempest
@@ -421,6 +429,7 @@
                 done
                 exit $status
 
+
 - builder:
     name: run-tests-NVMe-tempest
     builders:
@@ -451,71 +460,6 @@
                     exit 1
                 fi
 
-- builder:
-    name: run-tests-attach-volume-old
-    builders:
-        - shell: |
-                #!/bin/bash -ex
-                phase="RUN-TESTS-attach"
-                pushd $WORKSPACE/devstack
-
-                TIMEOUT=120
-                status=0
-                . openrc admin admin
-                volume_name=volume_nvme
-                openstack volume create --size 1 $volume_name
-                #cinder create 1 --name $volume_name
-                image=$(openstack image list|grep "cir"|awk '{print $4}')
-                nova hypervisor-list
-                sleep 20
-                openstack server create --flavor m1.tiny --image $image --network private vm1
-                nova show vm1
-                sleep 240
-                nova show vm1
-                openstack server list
-                openstack volume list
-                echo "Attaching nova volume"
-                nova=$(openstack server list | awk '{print $2}' | grep '-')
-                cinder_vol=$(openstack volume list| awk '{print $2}' | grep '-')
-                nova volume-attach $nova $cinder_vol
-                sleep 60
-
-                vstat=$(openstack volume list|grep $volume_name |awk '{print $6}')
-                openstack server list
-                openstack volume list
-
-                if [ "$vstat" != "in-use" ]; then
-                   openstack server list
-                   openstack volume list
-                   echo "ERROR: Volume attach failed. Status not in-use."
-                   exit 1
-                fi
-                echo "Detaching nova volume"
-                nova volume-detach $nova $cinder_vol
-                sleep 60
-                vstat=$(openstack volume list|grep $volume_name |awk '{print $6}')
-                if [ "$vstat" != "available" ]; then
-                   openstack volume list
-                   openstack server list
-                   echo "ERROR: Volume detach failed. Status still $vstat"
-                   exit 1
-                fi
-                openstack volume list
-                openstack server list
-                sleep 60
-                echo "Deleting volume"
-                openstack volume delete $cinder_vol
-                sleep 60
-                c=$(openstack volume list|grep $volume_name 2>&1|tee)
-                if [ "$c" != "" ]; then
-                    echo "ERROR Cinder not deleted"
-                    cinder list
-                    status=1
-                fi
-
-                openstack server delete $nova
-                echo "FINISHED: ############## $phase status=$status ###################"
-                exit $status
 
 - builder:
     name: configure-devstack-NVMe
@@ -620,13 +564,23 @@
             [[test-config|\$TEMPEST_CONFIG]]
             [volume]
             backend_names = lvmdriver-1,lvmdriver-2
+            build_timeout = 300
+
             [volume-feature-enabled]
             multi_backend = True
 
             [auth]
             tempest_roles = Admin
+
+            [compute]
+            build_timeout = 300
+
+            [validation]
+            ssh_timeout = 300
             EOF
             echo "FINISHED: ############## $phase  ###################"
+
+
 - project:
     name: SPDK
     node: SPDK
@@ -649,6 +603,7 @@
             IMAGE_SERVER=$EXT_SERVER
             PATH=$PATH:/usr/sbin
             SPDK_PATH=/jenkins/workspace/spdk/
+            PLACEMENT_BRANCH=refs/changes/34/681634/1
       - check-environment
       - mlnx-project-config
       - clean-environment
@@ -659,11 +614,12 @@
       #- clean-environment-{name}
       - rebuild_spdk_vol
       - configure-devstack-NVMe
+      - configure-devstack-SPDK
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack
       - apply-workarounds-post-stack-{name}
       #- rebuild_spdk_vol
-      #- run-tests-attach-volume
+      - run-tests-attach-volume
       #- rebuild_spdk_vol
       - run-tests-{name}-tempest
       - collect-logs-{name}
@@ -690,83 +646,8 @@
             #!/bin/bash -ex
             phase="configure-devstack-SPDK"
             echo "STARTED: ############## $phase  ###################"
-
-            if [[ -n $ZUUL_PROJECT ]]; then
-              project=$(echo $ZUUL_PROJECT | cut -d'/' -f2)
-              refspec=$(echo ${ZUUL_CHANGES##*^} | rev|cut -d':' -f1|rev)
-              project=${project//-/_}
-              export ${project^^}_BRANCH=$refspec
-            fi
-            i=1
-            export ip1=1.1.1.1
-            export ip2=2.2.2.2
-
-            for pci in $(lspci |grep $HCA | grep -v Virtual | awk '{print $1}');do
-                for p in $(ls -l /sys/class/net/|grep $pci | awk '{print $9}');do
-                    sudo ifconfig $p $i.$i.$i.$i/24 up
-                    let i=i+1
-                done
-            done
-
-            cat > $WORKSPACE/devstack/local.conf <<EOF
-            [[local|localrc]]
-            DOWNLOAD_DEFAULT_IMAGES=True
-            ADMIN_PASSWORD=password
-            MYSQL_PASSWORD=password
-            RABBIT_PASSWORD=password
-            SERVICE_PASSWORD=password
-            SERVICE_TOKEN=servicetoken
-            HOST_IP=$(hostname -I | awk '{print $1}')
-            FORCE=yes
-            RECLONE=yes
-            LOG_COLOR=False
-            #PIP_UPGRADE=True
-            LOGDIR=${LOGDIR:-/opt/stack/logs}
-            LOGFILE=$LOGDIR/stack.sh.log
-            LIBS_FROM_GIT=os-brick
-
-            # Cinder
-            VOLUME_GROUP_NAME="stack-volumes"
-            VOLUME_NAME_PREFIX="volume-"
-            VOLUME_BACKING_FILE_SIZE=10250M
-
-            disable_service n-net n-cauth h-eng h-api h-api-cfn h-api-cw etcd3 horizon dstat
-            enable_service neutron q-svc q-agt q-dhcp q-l3 q-meta n-xvnc n-novnc
-
-            ## Neutron options
-            Q_USE_SECGROUP=True
-
-            # Neutron ML2 with OpenVSwitch
-            NEUTRON_CREATE_INITIAL_NETWORKS=True
-            Q_PLUGIN=ml2
-            Q_AGENT=openvswitch
-            Q_ML2_TENANT_NETWORK_TYPE=vxlan
-            Q_L3_ENABLED=True
-
-            PUBLIC_NETWORK_NAME=external
-            PUBLIC_PHYSICAL_NETWORK=public
-            PHYSICAL_NETWORK=default
-
-            # Required for l3-agent to connect to external-network-bridge
-            PUBLIC_BRIDGE=br-ex
-            OVS_BRIDGE_MAPPINGS=public:br-ex
-
-            [[post-config|/etc/cinder/cinder.conf]]
-            [DEFAULT]
-            enabled_backends = spdk-1
-            default_volume_type = None
-
-            [[test-config|\$TEMPEST_CONFIG]]
-            [volume]
-            backend_names = spdk-1
-            [volume-feature-enabled]
-            multi_backend = False
-
-            [auth]
-            tempest_roles = Admin
-            EOF
-            echo "FINISHED: ############## $phase  ###################"
-            exit 1
+            cd $WORKSPACE/devstack
+            sed -i 's/DOWNLOAD_DEFAULT_IMAGES=True/DOWNLOAD_DEFAULT_IMAGES=False\nIMAGE_URLS="http:\/\/download.cirros-cloud.net\/0.3.5\/cirros-0.3.5-x86_64-disk.img,"/g' local.conf
 
 - builder:
     name: rebuild_spdk_vol
@@ -774,6 +655,18 @@
         - shell: |
             #!/bin/bash -x
             echo "Show SPDK devices"
+            vol=Nvme0
+            export SPDK_PATH=/jenkins/workspace/spdk
+
+            sudo $SPDK_PATH/scripts/rpc.py delete_nvme_controller $vol
+            sudo $SPDK_PATH/scripts/rpc.py -v construct_nvme_bdev -b $vol -t PCIe -a 06:00.0
+            sudo $SPDK_PATH/scripts/rpc.py get_nvme_controllers
+            sudo $SPDK_PATH/scripts/rpc.py get_lvol_stores
+            sudo $SPDK_PATH/scripts/rpc.py destroy_lvol_store -l lvs
+            sudo $SPDK_PATH/scripts/rpc.py construct_lvol_store ${vol}n1 lvs
+            echo "Show SPDK devices"
+            sudo $SPDK_PATH/scripts/rpc.py get_bdevs
+            exit $?
 
             # Working with NVMe Malloc0
             #for d in $(sudo $SPDK_PATH/scripts/rpc.py get_bdevs|egrep name|grep -v product_name|grep -v Malloc0|awk '{print $NF}'|cut -d',' -f1);do
@@ -794,13 +687,17 @@
             sudo $SPDK_PATH/scripts/rpc.py get_nvme_controllers
 
 
-            sudo $SPDK_PATH/scripts/rpc.py destroy_lvol_store -l lvs
-            sudo $SPDK_PATH/scripts/rpc.py construct_lvol_store ${vol}n1 lvs
-
+            #sudo $SPDK_PATH/scripts/rpc.py destroy_lvol_store -l lvs
+            sudo $SPDK_PATH/scripts/rpc.py bdev_lvol_delete_lvstore -l lvs
+            #sudo $SPDK_PATH/scripts/rpc.py construct_lvol_store ${vol}n1 lvs
+            sudo $SPDK_PATH/scripts/rpc.py bdev_lvol_create_lvstore ${vol}n1 lvs
             #sudo systemctl restart devstack@c-*
 
             echo "Show SPDK devices"
             sudo $SPDK_PATH/scripts/rpc.py get_bdevs
+            sudo $SPDK_PATH/scripts/rpc.py bdev_nvme_get_controllers
+            sudo $SPDK_PATH/scripts/rpc.py bdev_get_bdevs
+
 
 - builder:
     name: apply-workarounds-post-stack-SPDK
@@ -845,7 +742,7 @@
             volume_driver = cinder.volume.drivers.spdk.SPDKDriver
             volume_backend_name = SPDK
             EOF
-
+            sudo systemctl restart devstack@c*
             exit 0
 
 
@@ -866,6 +763,7 @@
         - shell: |
             #!/bin/bash -x
             exit 0
+
 
 - builder:
     name: run-tests-attach-volume
@@ -965,14 +863,20 @@
                 done
 
                 openstack volume delete $cinder_vol
-                sleep 60
-                c=$(openstack volume list|grep $volume_name 2>&1|tee)
-                if [ "$c" != "" ]; then
-                    echo "ERROR Cinder not deleted"
-                    cinder list
-                    status=1
-                fi
+                start=$(date +%s)
+                let stop=$(date +%s)+$TIMEOUT
 
+                c=$(openstack volume list|grep $volume_name 2>&1|tee)
+                while [ "$c" != "" ]; do
+                    sleep 10
+                    c=$(openstack volume list|grep $volume_name 2>&1|tee)
+                    echo "Volume still $c"
+                    if [ $stop -lt $(date +%s) ]; then
+                        echo "Volume is still exists"
+                        exit 1
+                    fi
+                done
                 openstack server delete $nova
+                sleep 10
                 echo "FINISHED: ############## $phase status=$status ###################"
                 exit $status

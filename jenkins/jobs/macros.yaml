@@ -23,6 +23,7 @@
 
             gzip -9 -r $log_file 2>&1|tee >/dev/null
             scp $arch $LOGSERVER://var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}/${NODE_TYPE}/
+            ssh $LOGSERVER chmod 777 -R /var/www/html/${LOG_PATH:-${JOB_NAME}/${BUILD_NUMBER}_${NODE_NAME}}/${NODE_TYPE}/
             rm -rf $arch $log_dir
 
 

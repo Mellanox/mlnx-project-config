@@ -329,6 +329,7 @@
             PATH=$PATH:/usr/sbin
             GIT_BASE=https://review.opendev.org
             PROJECT=https://review.opendev.org/x/networking-mlnx
+      - check-environment
       - mlnx-project-config
       - clone-project
       - epy27
@@ -367,6 +368,7 @@
             PATH=$PATH:/usr/sbin
             GIT_BASE=https://review.opendev.org
             PROJECT=https://review.opendev.org/x/networking-mlnx
+      - check-environment
       - mlnx-project-config
       - clone-project
       - pep8
@@ -474,6 +476,77 @@
 
 
 - job:
+    name: Mellanox-CI-Daily-Stabletrain-Status
+    project-type: multijob
+    node:  daily
+    concurrent: false
+    triggers:
+      - timed: '@daily'
+    builders:
+      - multijob:
+           name: Mellanox-CI-Daily-Stabletrain-Status
+           condition: ALWAYS
+           projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Nova-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Nova-MACVTAP-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Tempest-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Neutron-ML2-Sriov
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Neutron-ML2-MLNX
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Neutron-Networking-MLNX-ML2
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Cinder-ISER-LIO
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Cinder-ISER-ISCSI
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: OVS_HW_offload
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: OVS_HW_offload_Neutron
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+    properties:
+      - build-discarder:
+          days-to-keep: 70
+          num-to-keep: 100
+          artifact-days-to-keep: 70
+          artifact-num-to-keep: 10
+    wrappers:
+      - timeout:
+          timeout: 500
+
+
+- job:
     name: Mellanox-CI-Daily-Stablestein-Status
     project-type: multijob
     node:  daily
@@ -533,12 +606,6 @@
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/stein
-              #- name: DEBIAN_PACKAGE_CHECK
-              #  current-parameters: true
-              #  predefined-parameters: |
-              #     UBUNTUURL=https://stretch-stein.debian.net/job
-
-
     properties:
       - build-discarder:
           days-to-keep: 70
@@ -632,8 +699,8 @@
               - name: OVS_DPDK
               - name: Nova-ML2-Sriov
                 current-parameters: true
-              #- name: Nova-MACVTAP-ML2-Sriov
-              #  current-parameters: true
+              - name: Nova-MACVTAP-ML2-Sriov
+                current-parameters: true
               - name: Neutron-ML2-Sriov
                 current-parameters: true
               - name: Neutron-ML2-MLNX
@@ -648,8 +715,8 @@
                 current-parameters: true
               - name: Tempest-Sriov
                 current-parameters: true
-              #- name: Neutron-MACVTAP-ML2-Sriov
-              #  current-parameters: true
+              - name: Neutron-MACVTAP-ML2-Sriov
+                current-parameters: true
               - name: OVS_HW_offload
                 current-parameters: true
               - name: OVS_HW_offload_Neutron
@@ -877,7 +944,18 @@
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=master
-
+      - multijob:
+           name: Networking-MLNX-PEP8-PY27-Train
+           condition: ALWAYS
+           projects:
+              - name: Networking-MLNX-PEP8
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
+              - name: Networking-MLNX-EPY27
+                current-parameters: true
+                predefined-parameters: |
+                   ZUUL_BRANCH=stable/train
       - multijob:
            name: Networking-MLNX-PEP8-PY27-Stein
            condition: ALWAYS
@@ -890,7 +968,6 @@
                 current-parameters: true
                 predefined-parameters: |
                    ZUUL_BRANCH=stable/stein
-
       - multijob:
            name: Networking-MLNX-PEP8-PY27-Rocky
            condition: ALWAYS

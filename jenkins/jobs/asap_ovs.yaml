@@ -112,9 +112,8 @@
           passthrough_whitelist ={"'"address"'":"'"*:'"$pci"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
           enabled_filters = RetryFilter,AvailabilityZoneFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
-          #enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
-
           EOF
+
           echo "FINISHED: ############## $phase  ###################"
 
 - builder:
@@ -192,12 +191,9 @@
           Q_ML2_TENANT_NETWORK_TYPE=vlan
           PHYSICAL_NETWORK=default
           PUBLIC_INTERFACE=$pf
-          #PHYSICAL_INTERFACE=$pf
           TENANT_VLAN_RANGE=2:100
           NETWORK_API_EXTENSIONS=dhcp_agent_scheduler,external-net,ext-gw-mode,binding,quotas,agent,l3_agent_scheduler,provider,router,extraroute,security-group
-          #OVS_PHYSICAL_BRIDGE=br-$pf
           ALLOW_NEUTRON_DB_MIGRATIONS=true
-          #Q_USE_PROVIDERNET_FOR_PUBLIC=False
           OVS_BRIDGE_MAPPINGS=default:br-${PUBLIC_INTERFACE},public:br-ex
           # Services
           disable_service horizon h-eng h-api h-api-cfn h-api-cw etcd3 dstat
@@ -213,7 +209,6 @@
           passthrough_whitelist ={"'"address"'":"'"*:'"$pci"'.*"'","'"physical_network"'":"'"default"'"}
           [filter_scheduler]
           enabled_filters = RetryFilter,AvailabilityZoneFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
-          #enabled_filters = RetryFilter,AvailabilityZoneFilter,RamFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter,PciPassthroughFilter
           [[test-config|\$TEMPEST_CONFIG]]
           [network]
           port_vnic_type=direct
@@ -225,9 +220,6 @@
           resize=false
           [auth]
           tempest_roles = Admin
-          #[[post-config|/etc/neutron/l3_agent.ini]]
-          #[DEFAULT]
-          #external_network_bridge = br-ex
           EOF
           echo "FINISHED: ############## $phase  ###################"
 

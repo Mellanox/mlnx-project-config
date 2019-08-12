@@ -50,6 +50,7 @@
             #!/bin/bash -x
             phase="apply-workarounds-pre-stack-Cinder-ISER-LIO"
             sudo systemctl stop tgtd
+            exit 0
 
 - builder:
     name: configure-devstack-cinder
@@ -76,12 +77,6 @@
               project=${project//-/_}
               export ${project^^}_BRANCH=$refspec
             fi
-
-            #if [ "$ZUUL_BRANCH" == 'stable/pike' ]; then
-            #    export target='iscsi'
-            #else
-            #    export target='target'
-            #fi
 
             cat > $WORKSPACE/devstack/local.conf <<EOF
             [[local|localrc]]
@@ -119,8 +114,6 @@
             Q_ML2_TENANT_NETWORK_TYPE=vxlan
             Q_L3_ENABLED=True
 
-            #PUBLIC_NETWORK_NAME=external
-            #PUBLIC_PHYSICAL_NETWORK=public
             PHYSICAL_NETWORK=default
 
             # Required for l3-agent to connect to external-network-bridge
@@ -157,9 +150,8 @@
             multi_backend = True
             [compute]
             build_timeout = 300
-            #[[post-config|/etc/neutron/l3_agent.ini]]
-            #[DEFAULT]
-            #external_network_bridge = br-ex
+            [validation]
+            ssh_timeout = 300
             EOF
             echo "FINISHED: ############## $phase  ###################"
 
@@ -178,28 +170,6 @@
     concurrent: true
     jobs:
         - 'Cinder-ISER-LIO'
-
-########### SimX #############################
-#- project:
-#    name: SimX-Run-ISER-LIO
-#    github-org: openstack-dev
-#    node: CINDER-SIMX-LIO
-#    jobs:
-#        - 'SimX-Run-ISER-LIO'
-
-#- project:
-#    name: SimX-Run-ISER-ISCSI
-#    github-org: openstack-dev
-#    node: CINDER-SIMX-ISCSI
-#    jobs:
-#        - 'SimX-Run-ISER-ISCSI'
-
-#- project:
-#    name: SimX-Run-VM
-#    github-org: openstack-dev
-#    node: SimX-Server
-#    jobs:
-#        - 'SimX-Run-VM'
 
 
 - job-template:
@@ -228,7 +198,6 @@
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
       - apply-workarounds-post-stack-{name}
-      #- apply-workarounds-post-stack
       - run-tests-attach-volume
       - run-tests-cinder
       - produce-readme-file
@@ -248,122 +217,6 @@
       - timeout:
           timeout: 320
           fail: true
-
-- job-template:
-    name: 'SimX-Run-ISER-LIO'
-    node: '{node}'
-    concurrent: true
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.74.249.42
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
-            IMAGE_SERVER=13.74.249.42
-            PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-cinder
-      - run-stacksh # Running Devstack
-      #- apply-workarounds-post-stack
-      #- run-tests-cinder
-      - run-tests-cinder-lio-simx
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: mlnx-openstack-ci@dev.mellanox.co.il
-          subject: cinder job is being failed, please debug
-          failure: true
-      - upload-console-log
-    wrappers:
-      - timeout:
-          timeout: 320
-          fail: true
-
-- job-template:
-    name: 'SimX-Run-ISER-ISCSI'
-    node: '{node}'
-    concurrent: true
-    builders:
-      - inject:
-          properties-content: |
-            LOGDIR=$WORKSPACE/ci-artifacts/logs
-            EXT_SERVER=13.74.249.42
-            LOGSERVER=cloudx@$EXT_SERVER
-            HCA=mlx5
-            IMAGE_SERVER=13.74.249.42
-            PATH=$PATH:/usr/sbin
-      - check-environment
-      - mlnx-project-config
-      - clean-environment
-      - clone-devstack
-      - apply-workarounds-pre-stack
-      - configure-devstack-cinder
-      - run-stacksh # Running Devstack
-      #- apply-workarounds-post-stack
-      - run-tests-cinder
-      #- run-tests-cinder-iscsi-simx
-      - produce-readme-file
-    properties:
-      - build-discarder:
-          days-to-keep: 70
-          num-to-keep: 300
-          artifact-days-to-keep: 70
-          artifact-num-to-keep: 500
-    publishers:
-      - email-ext:
-          recipients: mlnx-openstack-ci@dev.mellanox.co.il
-          subject: cinder job is being failed, please debug
-          failure: true
-      - upload-console-log
-    wrappers:
-      - timeout:
-          timeout: 320
-          fail: true
-
-
-#- job-template:
-#    name: 'SimX-Run-VM'
-#    node: '{node}'
-#    concurrent: true
-#    builders:
-#      - inject:
-#          properties-content: |
-#            LOGDIR=$WORKSPACE/ci-artifacts/logs
-#            EXT_SERVER=13.74.249.42
-#            LOGSERVER=cloudx@$EXT_SERVER
-#            IMAGE_SERVER=13.74.249.42
-#            PATH=$PATH:/usr/sbin
-#            SIMX_SNAPSHOT=Simx2.4-2359_20170214
-#      - load-vm
-#      - waitforonline-vm
-#      - produce-readme-file
-#    properties:
-#      - build-discarder:
-#          days-to-keep: 70
-#          num-to-keep: 300
-#          artifact-days-to-keep: 70
-#          artifact-num-to-keep: 500
-#    publishers:
-#      - email-ext:
-#          recipients: mlnx-openstack-ci@dev.mellanox.co.il
-#          subject: SimX job is being failed, please debug
-#          failure: true
-#      - upload-console-log
-#    wrappers:
-#      - timeout:
-#          timeout: 320
-#          fail: true
 
 
 - job-template:
@@ -390,7 +243,6 @@
       - apply-workarounds-pre-stack-{name}
       - run-stacksh # Running Devstack
       - apply-workarounds-post-stack-cinder
-      #- apply-workarounds-post-stack
       - run-tests-attach-volume
       - run-tests-cinder
       - produce-readme-file
@@ -411,79 +263,6 @@
           timeout: 320
           fail: true
 
-
-######################################################
-###               SimX NODE CI     ##################
-######################################################
-#- job:
-#    name: SimX-Cinder-ISER-LIO
-#    project-type: multijob
-#    node: cloudx-17
-#    concurrent: true
-#    triggers:
-#      - timed: '@daily'
-#    builders:
-#       - multijob:
-#           name: SimX-Run-VM
-#           condition: ALWAYS
-#           projects:
-#              - name: SimX-Run-VM
-#                current-parameters: true
-#                predefined-parameters: |
-#                   HCA=MT27700
-#                   SIMX_VM=cloudx-17-07
-#       - multijob:
-#           name: SimX-Run-ISER-LIO
-#           condition: SUCCESSFUL
-#           projects:
-#              - name: SimX-Run-ISER-LIO
-#                current-parameters: true
-#                predefined-parameters: |
-#                   HCA=MT27700
-#    properties:
-#      - build-discarder:
-#          days-to-keep: 70
-#          num-to-keep: 300
-#          artifact-days-to-keep: 70
-#          artifact-num-to-keep: 500
-#    wrappers:
-#      - timeout:
-#          timeout: 500
-
-#- job:
-#    name: SimX-Cinder-ISER-ISCSI
-#    project-type: multijob
-#    node: cloudx-17
-#    concurrent: true
-#    triggers:
-#      - timed: '@daily'
-#    builders:
-#       - multijob:
-#           name: Simx-ISCSI
-#           condition: ALWAYS
-#           projects:
-#              - name: SimX-Run-VM
-#                current-parameters: true
-#                predefined-parameters: |
-#                   HCA=MT27700
-#                   SIMX_VM=cloudx-17-04
-#       - multijob:
-#           name: SimX-Run-ISER-ISCSI
-#           condition: SUCCESSFUL
-#           projects:
-#              - name: SimX-Run-ISER-ISCSI
-#                current-parameters: true
-#                predefined-parameters: |
-#                   HCA=MT27700
-#    properties:
-#      - build-discarder:
-#          days-to-keep: 70
-#          num-to-keep: 300
-#          artifact-days-to-keep: 70
-#          artifact-num-to-keep: 500
-#    wrappers:
-#      - timeout:
-#          timeout: 500
 
 
 - builder:
@@ -522,124 +301,3 @@
                     echo "FINISHED with ERROR: ############## $phase  ###################"
                     exit 1
                 fi
-
-- builder:
-    name: run-tests-cinder-lio-simx
-    builders:
-      - shell: |
-                #!/bin/bash +ex
-
-                echo "============ Starting tempest tests ====================="
-                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
-                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
-                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
-                       tempest.scenario.test_stamp_pattern.TestStampPattern
-                )
-                cd /opt/stack/tempest
-                stestr init
-                stestr list ${tests[@]}
-                test_pass=0
-                for test in ${tests[@]}; do
-                    stestr run $test
-                    rc=$?
-                    let test_pass=test_pass+$rc
-                done
-
-                if [[ $test_pass -ne 0 ]]; then
-                    echo "FINISHED with ERROR: ############## $phase  ###################"
-                    exit 1
-                fi
-
-- builder:
-    name: run-tests-cinder-iscsi-simx
-    builders:
-      - shell: |
-                #!/bin/bash +ex
-
-                echo "============ Starting tempest tests ====================="
-                tests=(tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes
-                       tempest.scenario.test_minimum_basic.TestMinimumBasicScenario
-                       tempest.scenario.test_snapshot_pattern.TestSnapshotPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPattern
-                       #tempest.scenario.test_volume_boot_pattern.TestVolumeBootPatternV2
-                       tempest.scenario.test_stamp_pattern.TestStampPattern
-                )
-                cd /opt/stack/tempest
-                stestr init
-                stestr list ${tests[@]}
-                virtualenv virt --no-site-packages
-                . virt/bin/activate
-                virt/bin/pip install -U -r requirements.txt
-                stestr run ${tests[@]}
-                test_pass=$?
-                deactivate
-
-                if [[ $test_pass -ne 0 ]]; then
-                    echo "FINISHED with ERROR: ############## $phase  ###################"
-                    exit 1
-                fi
-
-
-- builder:
-    name: load-vm
-    builders:
-        - shell: |
-            #!/bin/bash -x
-            SIMX_VM=${SIMX_VM:-'cloudx-17-07'}
-            phase="Loading VM $SIMX_VM"
-            echo "STARTED: ############## $phase  ###################"
-            sudo ls /var/lib/libvirt/images
-            sudo virsh shutdown --domain $SIMX_VM 2>&1|tee
-            #TODO add while it's not shuted down
-            virsh list | grep $SIMX_VM
-            sleep 120
-            sudo virsh snapshot-revert --domain $SIMX_VM --snapshotname $SIMX_SNAPSHOT --running
-            retries=10
-            while [ $retries -gt 0 ]; do
-                state=$(sudo virsh list | grep $SIMX_VM | awk '{print $3}')
-                if [ $state == 'running'  ]; then
-                    echo "$SIMX_VM is running"
-                    exit 0
-                fi
-                let retries=retries-1
-                sleep 6
-            done
-            echo "$SIMX_VM is not running"
-            exit 1
-
-- builder:
-    name: waitforonline-vm
-    builders:
-        - python: |
-            #!/usr/bin/python
-            import requests
-            import sys
-            import time
-            import os
-            from pprint import pprint
-
-            timeout = 500
-            stop = time.time() + timeout
-
-            SIMX_VM = os.environ.get('SIMX_VM','cloudx-17-07')
-            pprint(os.environ)
-            phase="Waiting for Online status of %s" % SIMX_VM
-            print phase
-            url = 'http://10.212.19.4:8080/computer/%s/api/json' % SIMX_VM
-            start = time.time()
-            print "Started", start
-            print "Time", time.time()
-            while (time.time() < stop):
-                r = requests.get(url)
-                if r.json()['offline']:
-                    time.sleep(2)
-                else:
-                    t = (time.time() - start)
-                    print "%s is Online after %d sec" % (SIMX_VM, t)
-                    time.sleep(20)
-                    sys.exit(0)
-            print "%s still Offline after %s seconds" % (SIMX_VM, timeout)
-            pprint(r.json())
-            sys.exit(1)
